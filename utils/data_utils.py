@@ -2,7 +2,6 @@ import torch
 import numpy as np
 from torchvision import datasets, transforms
 
-# Detect if we have a GPU available
 def get_kaggle_satellite_image_classification_dataset_as_numpy_arrays(
         data_dir = "../data/kaggle_satellite_image_classification",
     ):

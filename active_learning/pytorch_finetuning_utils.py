@@ -146,10 +146,10 @@ def train_model_given_numpy_arrays(model, x, y, criterion, optimizer, num_epochs
             running_loss += loss.item() * inputs.size(0)
             running_corrects += torch.sum(preds == labels)
 
-            epoch_loss = running_loss / len(y)
-            epoch_acc = running_corrects.double() / len(y)
-            if verbose:
-                print('{} Loss: {:.4f} Acc: {:.4f}'.format("Train", epoch_loss, epoch_acc))
+        epoch_loss = running_loss / len(y)
+        epoch_acc = running_corrects.double() / len(y)
+        if verbose:
+            print('{} Loss: {:.4f} Acc: {:.4f}'.format("Train", epoch_loss, epoch_acc))
 
     if verbose:
         print()
