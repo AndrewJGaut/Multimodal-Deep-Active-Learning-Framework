@@ -112,10 +112,6 @@ def train_model_given_numpy_arrays(model, x, y, criterion, optimizer, num_epochs
     since = time.time()
 
     for epoch in range(num_epochs):
-        if verbose:
-            print('Epoch {}/{}'.format(epoch, num_epochs - 1))
-            print('-' * 10)
-
         # Each epoch has a training and validation phase
         model.train()  # Set model to training mode
 
@@ -149,7 +145,8 @@ def train_model_given_numpy_arrays(model, x, y, criterion, optimizer, num_epochs
         epoch_loss = running_loss / len(y)
         epoch_acc = running_corrects.double() / len(y)
         if verbose:
-            print('{} Loss: {:.4f} Acc: {:.4f}'.format("Train", epoch_loss, epoch_acc))
+            print('Epoch {}/{} - Train Loss: {:.4f} Acc: {:.4f}'.format(
+                epoch, num_epochs - 1, epoch_loss, epoch_acc))
 
     if verbose:
         print()
