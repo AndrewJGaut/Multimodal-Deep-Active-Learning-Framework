@@ -46,3 +46,12 @@ def MAX_ENTROPY(probabilities: np.ndarray, labeling_batch_size: int) -> np.ndarr
     entropy = -np.sum(probabilities * np.log(probabilities + eps), axis=1)
     indices = np.argsort(entropy)[-labeling_batch_size:][::-1]
     return indices
+
+'''
+Random selection, which is useful to compare against non-active learning
+Args:
+    probabilities (np.ndarray): Base model output, shape = (n_unlabeled, n_categories)
+    labeling_batch_size (int): Number of samples which should be selected for labeling
+'''
+def RANDOM(probabilities: np.ndarray, labeling_batch_size: int) -> np.ndarray:
+    return np.random.choice(np.arange(probabilities.shape[0]), size=labeling_batch_size, replace=False)
