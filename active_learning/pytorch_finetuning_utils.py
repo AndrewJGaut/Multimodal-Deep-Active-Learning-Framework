@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import torchvision
+from torch.utils.data import TensorDataset, DataLoader
 from torchvision import datasets, models, transforms
 import matplotlib.pyplot as plt
 import time
@@ -97,10 +98,17 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25, is_ince
     return model, val_acc_history
 
 
-def train_model_given_numpy_arrays(model, x, y, criterion, optimizer, num_epochs=25, is_inception=False, verbose=True):
+def train_model_given_numpy_arrays(model, x, y, criterion, optimizer, num_epochs=25, batch_size=8, is_inception=False, verbose=True):
     if is_inception:
         raise NotImplementedError("training using tensors not supported for inception model")
-    
+
+    # Convert data to data loader so that it isn't allocated on the GPU all at once.
+    x_tensor = torch.tensor(x)
+    y_tensor = torch.tensor(y)
+    y_tensor = torch.argmax(y_tensor, 1)
+    dataset = TensorDataset(x_tensor,y_tensor)
+    dataloader = DataLoader(dataset,batch_size=batch_size,num_workers=0,shuffle=True)
+
     since = time.time()
 
     for epoch in range(num_epochs):
@@ -114,40 +122,37 @@ def train_model_given_numpy_arrays(model, x, y, criterion, optimizer, num_epochs
         running_loss = 0.0
         running_corrects = 0
 
-        # Convert data to tensors.
-        inputs = torch.tensor(x).to(device)
-        labels = torch.tensor(y).to(device)
-        labels = torch.argmax(labels, 1)
+        for inputs, labels in dataloader:
+            inputs = inputs.to(device)
+            labels = labels.to(device)
 
-        # zero the parameter gradients
-        optimizer.zero_grad()
+            # zero the parameter gradients
+            optimizer.zero_grad()
 
-        # forward
-        # track history if only in train
-        with torch.set_grad_enabled(True):
-            # Get model outputs and calculate loss
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            # forward
+            # track history if only in train
+            with torch.set_grad_enabled(True):
+                # Get model outputs and calculate loss
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
 
-            _, preds = torch.max(outputs, 1)
+                _, preds = torch.max(outputs, 1)
 
-            # backward + optimize only if in training phase
-            loss.backward()
-            optimizer.step()
+                # backward + optimize only if in training phase
+                loss.backward()
+                optimizer.step()
 
-        # statistics
-        running_loss += loss.item() * inputs.size(0)
-        running_corrects += torch.sum(preds == labels)
+            # statistics
+            running_loss += loss.item() * inputs.size(0)
+            running_corrects += torch.sum(preds == labels)
 
-        epoch_loss = running_loss / len(y)
-        epoch_acc = running_corrects.double() / len(y)
-        if verbose:
-            print('{} Loss: {:.4f} Acc: {:.4f}'.format("Train", epoch_loss, epoch_acc))
+            epoch_loss = running_loss / len(y)
+            epoch_acc = running_corrects.double() / len(y)
+            if verbose:
+                print('{} Loss: {:.4f} Acc: {:.4f}'.format("Train", epoch_loss, epoch_acc))
 
     if verbose:
         print()
-
-    if verbose:
         time_elapsed = time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
 
