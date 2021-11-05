@@ -97,6 +97,58 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25, is_ince
     return model, val_acc_history
 
 
+def train_model_given_numpy_arrays(model, x, y, criterion, optimizer, num_epochs=25, is_inception=False):
+    if is_inception:
+        raise NotImplementedError("training using tensors not supported for inception model")
+    
+    since = time.time()
+
+    for epoch in range(num_epochs):
+        print('Epoch {}/{}'.format(epoch, num_epochs - 1))
+        print('-' * 10)
+
+        # Each epoch has a training and validation phase
+        model.train()  # Set model to training mode
+
+        running_loss = 0.0
+        running_corrects = 0
+
+        # Convert data to tensors.
+        inputs = torch.tensor(x).to(device)
+        labels = torch.tensor(y).to(device)
+
+        # zero the parameter gradients
+        optimizer.zero_grad()
+
+        # forward
+        # track history if only in train
+        with torch.set_grad_enabled(True):
+            # Get model outputs and calculate loss
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+
+            _, preds = torch.max(outputs, 1)
+
+            # backward + optimize only if in training phase
+            loss.backward()
+            optimizer.step()
+
+        # statistics
+        running_loss += loss.item() * inputs.size(0)
+        running_corrects += torch.sum(preds == labels.data)
+
+        epoch_loss = running_loss / len(y)
+        epoch_acc = running_corrects.double() / len(y)
+
+        print('{} Loss: {:.4f} Acc: {:.4f}'.format("Train", epoch_loss, epoch_acc))
+
+    print()
+
+    time_elapsed = time.time() - since
+    print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+
+    return model
+
 
 def set_parameter_requires_grad(model, feature_extracting):
     if feature_extracting:
