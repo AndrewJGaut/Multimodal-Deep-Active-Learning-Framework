@@ -4,8 +4,8 @@ from tqdm import tqdm, trange
 import time
 import sklearn.metrics as skm
 
-from model_interface import ModelInterface
-import metrics
+from test_framework.model_interface import ModelInterface
+import test_framework.metrics
 
 '''
 Defines the testing framework which stores, trains, and queries a set of active learning models,
