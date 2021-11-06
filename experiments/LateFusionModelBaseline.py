@@ -71,13 +71,15 @@ second_modality =  datasets.ImageFolder(PATH_TO_DATA, transform=second_modality_
 first_modality = get_kaggle_satellite_image_classification_dataset_as_numpy_arrays(PATH_TO_DATA)
 second_modality = get_kaggle_satellite_image_classification_dataset_as_numpy_arrays(PATH_TO_DATA, True)
 
-tester_x = np.stack((first_modality[0], second_modality[0]))
+tester_x = np.stack((first_modality[0], second_modality[0]), axis=1) #np.stack((first_modality[0], second_modality[0]))
 tester_y = first_modality[1]
 
 multimodal_model = LateFusionModelWithMeanProbabilityUncertaintySampling([ProbabilisticSVM(), ProbabilisticSVM()], MEAN_CLASSIFICATION)
 
 if __name__ == "__main__":
-    tester = Tester(tester_x, tester_y)
+    tester = Tester(tester_x, tester_y, training_epochs=1, active_learning_loop_count=2)
+    tester.test_model(multimodal_model)
+    tester.plot_results()
 
 
 

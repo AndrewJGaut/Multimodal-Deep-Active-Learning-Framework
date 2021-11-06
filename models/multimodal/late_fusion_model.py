@@ -51,8 +51,9 @@ class LateFusionModel(ModelInterface):
         (float):    Average training loss
     '''
     def train(self, train_x: np.ndarray, train_y: np.ndarray) -> None:
+        swapped_axes_train_x = np.swapaxes(train_x, 0,1) # this has shape num_modalities, shape_of_unimodal_data
         for i,model in enumerate(self.models):
-            model.train(train_x[i], train_y)
+            model.train(swapped_axes_train_x[i], train_y)
 
     '''
     Function called to request that the model predict outputs for the given val/test dataset.
@@ -66,7 +67,8 @@ class LateFusionModel(ModelInterface):
 
     def predict(self, test_x: np.ndarray) -> np.ndarray:
         # note: I think there's a better way to create the np array passed an argument below.
-        return self.combination_function(np.array([self.models[i].predict(test_x[i]) for i in range(len(self.models))]))
+        swapped_axes_test_x = np.swapaxes(test_x, 0, 1)
+        return self.combination_function(np.array([self.models[i].predict(swapped_axes_test_x[i]) for i in range(len(self.models))]))
 
     '''
      Function called to request that the model use its active learning algorithm to choose a subset of

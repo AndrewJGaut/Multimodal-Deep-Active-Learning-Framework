@@ -1,11 +1,12 @@
 import numpy as np
 from test_framework.model_interface import ModelInterface
-from sklearn import svm
+import sklearn
 
 
 
 class ProbabilisticSVM(ModelInterface):
-    clf = svm.SVC(probability=True)
+    #clf = svm.SVC(probability=True)
+    clf = sklearn.linear_model.SGDClassifier(loss="log")
 
     def name(self) -> str:
         return "SVM"
@@ -14,10 +15,15 @@ class ProbabilisticSVM(ModelInterface):
         return "default_hyperparameters"
 
     def train(self, train_x: np.ndarray, train_y: np.ndarray) -> None:
+        if len(train_x.shape) > 2:
+            train_x = train_x.reshape(train_x.shape[0], -1)
         self.clf.fit(train_x, train_y)
 
     def predict(self, test_x: np.ndarray) -> np.ndarray:
-        return self.clf.predict_proba(test_x)
+        if len(test_x.shape) > 2:
+            test_x = test_x.reshape(test_x.shape[0], -1)
+        pred_probabilities = self.clf.predict_proba(test_x)
+        return np.argmax(pred_probabilities, axis=1)
 
     """
     This implements the basic uncertainty sampling method.
