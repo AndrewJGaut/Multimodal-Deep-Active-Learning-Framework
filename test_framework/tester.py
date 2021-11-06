@@ -5,7 +5,7 @@ import time
 import sklearn.metrics as skm
 
 from .model_interface import ModelInterface
-from .import metrics
+from . import metrics
 
 '''
 Defines the testing framework which stores, trains, and queries a set of active learning models,
