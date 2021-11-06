@@ -44,7 +44,7 @@ def get_kaggle_satellite_image_classification_dataset_as_numpy_arrays(
 
 
 
-PATH_TO_DATA = "../data/kaggle_satellite_image_classification/data"
+PATH_TO_DATA = "./data/kaggle_satellite_image_classification"
 """
 transform = transforms.Compose([transforms.RandomResizedCrop(224),
                                       transforms.ToTensor(),

@@ -7,9 +7,13 @@ from models.unimodal.pytorch_finetuning_utils import *
 
 
 class SqueezeNet(ModelInterface):
-    def __init__(self, model, name="no name provided", details="no details provided", feature_extract=True,
+    def __init__(self, model=None, model_name = None, num_dataset_classes=4, name="no name provided", details="no details provided", feature_extract=True,
                  num_epochs=3, batch_size=8, train_verbose=True,
                  query_function=None):
+        self.model = model
+        if model is None:
+            self.model, _ = initialize_model(model_name, num_dataset_classes, feature_extract, use_pretrained=True)
+
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         model.to(device)
         self.model = model

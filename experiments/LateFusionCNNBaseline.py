@@ -9,7 +9,7 @@ import active_learning.categorical_query_functions as query_functions
 
 
 
-PATH_TO_DATA = "../data/kaggle_satellite_image_classification/data"
+PATH_TO_DATA = "./data/kaggle_satellite_image_classification"
 active_learning_functions = [query_functions.RANDOM, query_functions.MIN_MAX, query_functions.MAX_ENTROPY, query_functions.MIN_MARGIN]
 active_learning_function_descriptions = ["Random", "Min-Max", "Max-Ent", "Min-Margin"]
 
@@ -24,9 +24,10 @@ if __name__ == "__main__":
     tester = Tester(tester_x, tester_y, training_epochs=3, active_learning_loop_count=16)
     tester.INITIAL_TRAIN_DATA_FRACTION = 0.05
 
-    for active_learning_function in active_learning_functions:
+    for i,active_learning_function in enumerate(active_learning_functions):
         # define model
-        multimodal_model = LateFusionModel([SqueezeNet(), SqueezeNet()], MEAN_CLASSIFICATION, active_learning_function)
+        multimodal_model = LateFusionModel([SqueezeNet(), SqueezeNet()], MEAN_CLASSIFICATION, active_learning_function, name="Multimodal squeezenets model",
+                                           details=active_learning_function_descriptions[i])
 
         # test model
         tester.test_model(multimodal_model)

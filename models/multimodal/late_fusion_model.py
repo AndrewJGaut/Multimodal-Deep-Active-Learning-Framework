@@ -17,10 +17,14 @@ class LateFusionModel(ModelInterface):
             ((*args) -> np.ndarray: this function will be used to combine predictions from the models
                                     E.g., if we used the MEAN function, then preditions would be averaged. (For a probability distribution, this would have to be renormalized)
     '''
-    def __init__(self, models, combination_function, active_learning_function=None):
+    def __init__(self, models, combination_function, active_learning_function=None,
+                 name=None, details=None):
         self.models = models
         self.combination_function = combination_function
         self.active_learning_function = active_learning_function
+
+        self.name = name
+        self.details = details
 
     # IDENTIFIER METHODS
     '''
@@ -29,14 +33,18 @@ class LateFusionModel(ModelInterface):
         (str): Name for model
     '''
     def name(self) -> str:
-        return "Multimodal Late Fusion with component models " + "_".join(model.name() for model in self.models)
+        if self.name is None:
+            return "Multimodal Late Fusion with component models " + "_".join(model.name() for model in self.models)
+        return self.name
 
     '''
     Extra details about the model. May be used to specify hyperparameter values, etc which distinguish the
     model from others but don't fit in the shorthand name.
     '''
     def details(self) -> str:
-        return "_".join(model.details() for model in self.models)
+        if self.details is None:
+            return "_".join(model.details() for model in self.models)
+        return self.details
 
     # INTERACTION METHODS
     '''
