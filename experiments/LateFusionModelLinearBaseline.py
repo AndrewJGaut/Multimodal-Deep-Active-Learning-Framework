@@ -1,5 +1,5 @@
 """Linear models are NOT working right now."""
-
+"""
 
 from models.multimodal.late_fusion_model import LateFusionModel
 from models.multimodal.late_fusion_model_with_mean_probability_uncertainty_sampling import LateFusionModelWithMeanProbabilityUncertaintySampling
@@ -46,6 +46,7 @@ def get_kaggle_satellite_image_classification_dataset_as_numpy_arrays(
 
 PATH_TO_DATA = "./data/kaggle_satellite_image_classification"
 """
+"""
 transform = transforms.Compose([transforms.RandomResizedCrop(224),
                                       transforms.ToTensor(),
                                     transforms.RandomHorizontalFlip(),
@@ -71,6 +72,7 @@ second_modality_transform =transforms.Compose([transforms.RandomResizedCrop(224)
 first_modality = datasets.ImageFolder(PATH_TO_DATA, transform=transform)
 second_modality =  datasets.ImageFolder(PATH_TO_DATA, transform=second_modality_transform)
 """
+"""
 first_modality = get_kaggle_satellite_image_classification_dataset_as_numpy_arrays(PATH_TO_DATA)
 second_modality = get_kaggle_satellite_image_classification_dataset_as_numpy_arrays(PATH_TO_DATA, True)
 
@@ -83,7 +85,7 @@ if __name__ == "__main__":
     tester = Tester(tester_x, tester_y, training_epochs=1, active_learning_loop_count=2)
     tester.test_model(multimodal_model)
     tester.plot_results()
-
+"""
 
 
 

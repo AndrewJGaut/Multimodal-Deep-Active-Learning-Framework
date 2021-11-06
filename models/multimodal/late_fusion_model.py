@@ -77,7 +77,8 @@ class LateFusionModel(ModelInterface):
     def predict(self, test_x: np.ndarray) -> np.ndarray:
         # note: I think there's a better way to create the np array passed an argument below.
         swapped_axes_test_x = np.swapaxes(test_x, 0, 1)
-        return self.combination_function(np.array([self.models[i].predict(swapped_axes_test_x[i]) for i in range(len(self.models))]))
+        probabilities = self.combination_function(np.array([self.models[i].predict_proba(swapped_axes_test_x[i]) for i in range(len(self.models))]))
+        return np.argmax(probabilities,axis=1).reshape(-1,)
 
     '''
      Function called to request that the model use its active learning algorithm to choose a subset of
@@ -103,11 +104,11 @@ class LateFusionModel(ModelInterface):
         all_preds = []
 
         swapped_axes_unlabeled_data = np.swapaxes(unlabeled_data, 0, 1)
-        for i, model in enumerate(self.models):
-            preds = model.predict_proba(
-                swapped_axes_unlabeled_data[i].reshape(swapped_axes_unlabeled_data[i].shape[0], -1))
+        for i in len(self.models):
+            preds = self.models[i].predict_proba(swapped_axes_unlabeled_data[i])
             all_preds.append(preds)
 
-        means_all_preds = np.mean(all_preds, axis=0).reshape(-1, 1)
-        return self.active_learning_function(means_all_preds)
+        all_preds = np.array(all_preds)
+        means_all_preds = np.mean(all_preds, axis=0)
+        return self.active_learning_function(means_all_preds, labeling_batch_size)
 

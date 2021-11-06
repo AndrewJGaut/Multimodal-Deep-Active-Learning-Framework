@@ -68,6 +68,7 @@ class SqueezeNet(ModelInterface):
     def predict_proba(self, test_x: np.ndarray) -> np.ndarray:
         softmax = lambda x: np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
         softmax_outputs = softmax(self.predict(test_x))
+        return softmax_outputs
 
     def query(self, unlabeled_data: np.ndarray, labeling_batch_size: int) -> np.ndarray:
         softmax_outputs = self.predict_proba(unlabeled_data)
