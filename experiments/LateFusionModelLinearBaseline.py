@@ -1,3 +1,6 @@
+"""Linear models are NOT working right now."""
+
+
 from models.multimodal.late_fusion_model import LateFusionModel
 from models.multimodal.late_fusion_model_with_mean_probability_uncertainty_sampling import LateFusionModelWithMeanProbabilityUncertaintySampling
 from models.unimodal.probabilistic_svm import ProbabilisticSVM

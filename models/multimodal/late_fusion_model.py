@@ -17,9 +17,10 @@ class LateFusionModel(ModelInterface):
             ((*args) -> np.ndarray: this function will be used to combine predictions from the models
                                     E.g., if we used the MEAN function, then preditions would be averaged. (For a probability distribution, this would have to be renormalized)
     '''
-    def __init__(self, models, combination_function):
+    def __init__(self, models, combination_function, active_learning_function=None):
         self.models = models
         self.combination_function = combination_function
+        self.active_learning_function = active_learning_function
 
     # IDENTIFIER METHODS
     '''
@@ -28,7 +29,7 @@ class LateFusionModel(ModelInterface):
         (str): Name for model
     '''
     def name(self) -> str:
-        return "_".join(model.name() for model in self.models)
+        return "Multimodal Late Fusion with component models " + "_".join(model.name() for model in self.models)
 
     '''
     Extra details about the model. May be used to specify hyperparameter values, etc which distinguish the
@@ -85,4 +86,20 @@ class LateFusionModel(ModelInterface):
 
     # NOTE: I would really like to have a better way to handle this, but it's not too obvious what that method is
     def query(self, unlabeled_data: np.ndarray, labeling_batch_size: int) -> np.ndarray:
-        raise NotImplementedError
+
+        if self.active_learning_function is None:
+            raise Exception("If you want to use the default multimodal query function, you need to supply an active learning function upon model instantiation.")
+
+        # default implementation is to use the active learning function provided as model input
+        # and call it on the mean of the output probabilities of the models.
+        all_preds = []
+
+        swapped_axes_unlabeled_data = np.swapaxes(unlabeled_data, 0, 1)
+        for i, model in enumerate(self.models):
+            preds = model.predict_proba(
+                swapped_axes_unlabeled_data[i].reshape(swapped_axes_unlabeled_data[i].shape[0], -1))
+            all_preds.append(preds)
+
+        means_all_preds = np.mean(all_preds, axis=0).reshape(-1, 1)
+        return self.active_learning_function(means_all_preds)
+
