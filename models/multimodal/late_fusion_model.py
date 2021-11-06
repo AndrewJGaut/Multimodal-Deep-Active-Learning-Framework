@@ -23,8 +23,8 @@ class LateFusionModel(ModelInterface):
         self.combination_function = combination_function
         self.active_learning_function = active_learning_function
 
-        self.name = name
-        self.details = details
+        self._name = name
+        self._details = details
 
     # IDENTIFIER METHODS
     '''
@@ -33,18 +33,18 @@ class LateFusionModel(ModelInterface):
         (str): Name for model
     '''
     def name(self) -> str:
-        if self.name is None:
+        if self._name is None:
             return "Multimodal Late Fusion with component models " + "_".join(model.name() for model in self.models)
-        return self.name
+        return self._name
 
     '''
     Extra details about the model. May be used to specify hyperparameter values, etc which distinguish the
     model from others but don't fit in the shorthand name.
     '''
     def details(self) -> str:
-        if self.details is None:
+        if self._details is None:
             return "_".join(model.details() for model in self.models)
-        return self.details
+        return self._details
 
     # INTERACTION METHODS
     '''

@@ -105,7 +105,7 @@ def train_model_given_numpy_arrays(model, x, y, criterion, optimizer, num_epochs
     # Convert data to data loader so that it isn't allocated on the GPU all at once.
     x_tensor = torch.tensor(x)
     y_tensor = torch.tensor(y)
-    y_tensor = torch.argmax(y_tensor, 1)
+    # y_tensor = torch.argmax(y_tensor, 1)
     dataset = TensorDataset(x_tensor,y_tensor)
     dataloader = DataLoader(dataset,batch_size=batch_size,num_workers=0,shuffle=True)
 
@@ -228,7 +228,10 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         model_ft.fc = nn.Linear(num_ftrs,num_classes)
         input_size = 299
 
+
     else:
         print("Invalid model name, exiting...")
         exit()
 
+
+    return model_ft, input_size
