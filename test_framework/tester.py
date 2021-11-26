@@ -4,8 +4,8 @@ from tqdm import tqdm, trange
 import time
 import sklearn.metrics as skm
 
-from .model_interface import ModelInterface
-from . import metrics
+from test_framework.model_interface import ModelInterface
+import test_framework.metrics as metrics
 
 '''
 Defines the testing framework which stores, trains, and queries a set of active learning models,
@@ -19,7 +19,7 @@ class Tester:
         y_data (np.ndarray):    The full set of dataset outputs. First axis is batch, other axes will be untouched
                                 and sent to loss function as is.
     '''
-    def __init__(self, x_data:np.ndarray, y_data:np.ndarray) -> None:
+    def __init__(self, x_data:np.ndarray, y_data:np.ndarray, training_epochs=10, active_learning_loop_count=10) -> None:
         '''
         --- Default Config ---
         '''
@@ -39,10 +39,10 @@ class Tester:
         self.INITIAL_TRAIN_DATA_FRACTION = 0.5
 
         # Number of active learning loops (train, query, repeat) in one test
-        self.ACTIVE_LEARNING_LOOP_COUNT = 10
+        self.ACTIVE_LEARNING_LOOP_COUNT = active_learning_loop_count
 
         # Number of training epochs each model gets in each active learning loop
-        self.TRAINING_EPOCHS = 10
+        self.TRAINING_EPOCHS = training_epochs
 
         # Number of samples added to training data in each active learning loop
         self.ACTIVE_LEARNING_BATCH_SIZE = 32
