@@ -17,6 +17,20 @@ import copy
 # Detect if we have a GPU available
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+'''
+Trains a unimodal model given dataloader representing a supervised dataset
+From https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html
+Args:
+    model: Pytorch model
+    dataloaders: Pytorch DataLoader for unimodal dataset
+    criterion: loss function, e.g. torch.nn.CrossEntropyLoss()
+    optimizer: Pytorch optimizer, e.g. torch.optim.SGD()
+    num_epochs (int): number of epochs to train.
+    is_inception (bool): whether the model is an inception model.
+Returns:
+    model: Trained Pytorch model with weights from the epoch with the best valid accuracy.
+    val_acc_history (list): list of floats, valid accuracy in each training epoch.
+'''
 def train_model(model, dataloaders, criterion, optimizer, num_epochs=25, is_inception=False):
     since = time.time()
 
@@ -98,6 +112,20 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25, is_ince
     return model, val_acc_history
 
 
+'''
+Trains a unimodal model given numpy arrays representing a supervised dataset.
+Args:
+    model: Pytorch model
+    x (np.ndarray): training data, shape = (n_samples,n_color_channels,x_dim,y_dim)
+    y (np.ndarray): categorical training labels, shape = (n_samples,)
+    criterion: loss function, e.g. torch.nn.CrossEntropyLoss()
+    optimizer: Pytorch optimizer, e.g. torch.optim.SGD()
+    num_epochs (int): number of epochs to train.
+    is_inception (bool): whether the model is an inception model.
+    verbose (bool): whether to print during training.
+Returns:
+    model: trained Pytorch model with weights from the last training epoch.
+'''
 def train_model_given_numpy_arrays(model, x, y, criterion, optimizer, num_epochs=25, batch_size=8, is_inception=False, verbose=True):
     if is_inception:
         raise NotImplementedError("training using tensors not supported for inception model")
@@ -155,14 +183,20 @@ def train_model_given_numpy_arrays(model, x, y, criterion, optimizer, num_epochs
 
     return model
 
-
+'''
+Helper function
+From https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html
+'''
 def set_parameter_requires_grad(model, feature_extracting):
     if feature_extracting:
         for param in model.parameters():
             param.requires_grad = False
 
 
-
+'''
+Load untrained or pretrained pytorch model.
+From https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html
+'''
 def initialize_model(model_name, num_classes, feature_extract, use_pretrained=True):
     # Initialize these variables which will be set in this if statement. Each of these
     #   variables is model specific.
