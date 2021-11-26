@@ -2,7 +2,6 @@ import torch
 import numpy as np
 from torchvision import datasets, transforms
 
-
 def get_kaggle_satellite_image_classification_dataset_as_numpy_arrays(
         data_dir="../data/kaggle_satellite_image_classification",
         adjust_contrast=False
@@ -31,4 +30,3 @@ def get_kaggle_satellite_image_classification_dataset_as_numpy_arrays(
     y = next(iter(all_data_dataloader))[1].numpy()
 
     return x, y
-

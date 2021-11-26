@@ -146,7 +146,7 @@ class Tester:
     Plots and saves train/test curves for all models, along with their AUC measures
     '''
     def plot_results(self, plot_savename="test_results.png") -> None:
-        fig, axarr = plt.subplots(2, 2)
+        fig, axarr = plt.subplots(2, 2, figsize=(10,8))
 
         model_names = [r.model_name for r in self.model_results]
 
