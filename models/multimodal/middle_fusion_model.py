@@ -80,6 +80,7 @@ Defines a wrapper for a middle fusion model based on AlexNet
 class MiddleFusionNet(torch.nn.Module):
     def __init__(self, num_classes: int = 4, dropout: float = 0.5) -> None:
         super(MiddleFusionNet, self).__init__()
+        self.num_classes = num_classes
 
         self.features = nn.Sequential(
             nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2),
@@ -99,25 +100,27 @@ class MiddleFusionNet(torch.nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
         self.classifier = nn.Sequential(
             nn.Dropout(p=dropout),
-            nn.Linear(256 * 6 * 6 * 2, 4096), # added *2
+            nn.Linear(256 * 6 * 6, 4096),
             nn.ReLU(inplace=True),
             nn.Dropout(p=dropout),
             nn.Linear(4096, 4096),
             nn.ReLU(inplace=True),
-            nn.Linear(4096, num_classes),
+            # nn.Linear(4096, num_classes),
         )
+        self.final_linear = nn.Linear(4096*2, num_classes)
     def forward(self, x_satellite: torch.Tensor, x_streetlevel: torch.Tensor) -> torch.Tensor:
-        self.features_satellite = self.features(x_satellite)
-        self.features_satellite = self.avgpool(self.features_satellite)
-        self.features_satellite = torch.flatten(self.features_satellite, 1)
+        features_satellite = self.features(x_satellite)
+        features_satellite = self.avgpool(features_satellite)
+        features_satellite = torch.flatten(features_satellite, 1)
+        embeddings_satellite = self.classifier(features_satellite)
 
-        self.features_streetlevel = self.features(x_streetlevel)
-        self.features_streetlevel = self.avgpool(self.features_streetlevel)
-        self.features_streetlevel = torch.flatten(self.features_streetlevel, 1)
+        features_streetlevel = self.features(x_streetlevel)
+        features_streetlevel = self.avgpool(features_streetlevel)
+        features_streetlevel = torch.flatten(features_streetlevel, 1)
+        embeddings_streetlevel = self.classifier(features_streetlevel)
         
-        self.all_features = torch.cat((self.features_satellite,self.features_streetlevel),1)
-
-        output = self.classifier(self.all_features)
+        all_embeddings = torch.cat((embeddings_satellite,embeddings_streetlevel),1)
+        output = self.final_linear(all_embeddings)
         return output
     def details(self):
         return "a middle fusion model based on AlexNet"
