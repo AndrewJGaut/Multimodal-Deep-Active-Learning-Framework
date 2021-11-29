@@ -1,4 +1,3 @@
-
 import sys
 sys.path.append("..")
 from models.multimodal.middle_fusion_model import MiddleFusionModel
@@ -8,8 +7,6 @@ from test_framework.tester import Tester
 import numpy as np
 from utils.data_utils import get_kaggle_satellite_image_classification_dataset_as_numpy_arrays
 from active_learning import categorical_query_functions as query_functions
-
-
 
 PATH_TO_DATA = "../data/kaggle_satellite_image_classification"
 active_learning_functions = [query_functions.RANDOM, query_functions.MIN_MAX, query_functions.MAX_ENTROPY, query_functions.MIN_MARGIN]
@@ -26,12 +23,9 @@ if __name__ == "__main__":
     tester_y = tester_y[order]
     tester_x = tester_x[:600]
     tester_y = tester_y[:600]
-    print(tester_y[-1])
 
     tester_y_onehot = np.zeros((tester_y.size, 4))
     tester_y_onehot[np.arange(tester_y.size),tester_y] = 1
-    print(tester_y_onehot.shape)
-
     import collections
     print(collections.Counter(tester_y))
     print(collections.Counter(first_modality[1]))

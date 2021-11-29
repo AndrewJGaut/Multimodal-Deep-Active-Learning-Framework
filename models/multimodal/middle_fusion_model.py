@@ -107,9 +107,6 @@ class MiddleFusionNet(torch.nn.Module):
             nn.Linear(4096, num_classes),
         )
     def forward(self, x_satellite: torch.Tensor, x_streetlevel: torch.Tensor) -> torch.Tensor:
-        # print(x.shape)
-        # x_satellite, x_streetlevel = x1, x2
-        #(x_satellite: torch.Tensor, x_streetlevel: torch.Tensor)
         features_satellite = self.features(x_satellite)
         features_satellite = self.avgpool(features_satellite)
         features_satellite = torch.flatten(features_satellite, 1)
@@ -175,73 +172,6 @@ class MiddleFusionModel(ModelInterface):
     def details(self) -> str:
         return self.model.details()
 
-    # # INTERACTION METHODS
-    # '''
-    # Function called to request that the model train on the given training dataset. Training should pass
-    # through the dataset only once (1 epoch). Testing framework will call repeatedly to achieve multiple epochs.
-    # Args:
-    #     train_x (np.ndarray):       Training inputs, with batch as the first axis.
-    #                                 In this case, these should have shape len(self.models), shape_of_data_for_each_modality
-    #                                 In other words, the index into axis0 gives the index of the modality
-    #     train_y (np.ndarray):       Training outputs for supervised learning, with batch as the first axis.
-    #                                 Should have shape (num_examples)
-    # Returns:
-    #     (float):    Average training loss
-    # '''
-    # def train(self, train_x: np.ndarray, train_y: np.ndarray) -> None:
-    #     swapped_axes_train_x = np.swapaxes(train_x, 0,1)
-    #     # print(train_x.shape)
-    #     train_x_satellite,train_x_streetlevel = swapped_axes_train_x
-    #     train_x_tuple = (train_x_satellite,train_x_streetlevel)
-    #     self.model.train(train_x_tuple,train_y)
-    #     # self.model.train((train_x_1,train_x_2),train_y)
-    #     # swapped_axes_train_x = np.swapaxes(train_x, 0,1) # this has shape num_modalities, shape_of_unimodal_data
-    #     # for i,model in enumerate(self.models):
-    #     #     model.train(swapped_axes_train_x[i], train_y)
-
-    # '''
-    # Function called to request that the model predict outputs for the given val/test dataset.
-    # Args:
-    #     test_x (np.ndarray):    Testing inputs, with batch as the first axis.
-    #                             Should have shape len(self.models),shape_of_each_modality
-    # Returns:
-    #     (np.ndarray):           Network outputs, with batch as the first axis, corresponding to each sample
-    #                             in test_x.
-    # '''
-
-    # def predict(self, test_x) -> np.ndarray:
-    #     #test_x_satellite: np.ndarray, test_x_streetlevel: np.ndarray
-    #     swapped_axes_test_x = np.swapaxes(test_x, 0,1)
-    #     test_x_satellite,test_x_streetlevel = swapped_axes_test_x
-    #     probabilities = self.model.predict_proba((test_x_satellite,test_x_streetlevel))
-    #     return np.argmax(probabilities,axis=1).reshape(-1,)
-
-    # '''
-    #  Function called to request that the model use its active learning algorithm to choose a subset of
-    #  'unlabeled' samples, which will then be labeled and added to the training set.
-    #  NOTE: The default implementation for this function samples randomly from the unlabeled set.
-    #  Args:
-    #      unlabeled_data (np.ndarray):    Batch of 'unlabeled' inputs from the dataset which are available to be
-    #                                      labeled and added to the training dataset in the next training iteration.
-    #      labeling_batch_size (int):      Number of 'unlabeled' inputs which should be chosen for labeling.
-    #  Returns:
-    #      (np.ndarray):   1-D array of indices into the <unlabeled_data> array, indicating which samples should be
-    #                      labeled and added to training dataset. Shape = (labeling_batch_size,).
-    #  '''
-
-    # def query(self, unlabeled_satellite_data: np.ndarray, unlabeled_streetlevel_data: np.ndarray, labeling_batch_size: int) -> np.ndarray:
-
-    #     if self.active_learning_function is None:
-    #         raise Exception("If you want to use the default multimodal query function, you need to supply an active learning function upon model instantiation.")
-
-    #     # default implementation is to use the active learning function provided as model input
-    #     # and call it on the mean of the output probabilities of the models.
-    #     preds = self.model.predict_proba(unlabeled_satellite_data,unlabeled_streetlevel_data)
-
-    #     return self.active_learning_function(preds, labeling_batch_size)
-
-
-
     def train(self, train_x: np.ndarray, train_y: np.ndarray) -> None:
         x1,x2 = np.swapaxes(train_x,0,1)
         self.model = train_model_given_numpy_arrays(self.model, x1, x2, train_y, self._criterion, self._optimizer,
@@ -265,7 +195,6 @@ class MiddleFusionModel(ModelInterface):
         self.model.eval()
         softmax = lambda x: np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
         softmax_outputs = softmax(self.predict(test_x))
-        print(softmax_outputs)
         return softmax_outputs
 
     def query(self, unlabeled_data: np.ndarray, labeling_batch_size: int) -> np.ndarray:
