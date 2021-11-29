@@ -118,7 +118,7 @@ class Tester:
             for al_loop in al_loop_range:
                 # Train Model on current training data
                 pre_train_time = time.time()
-                al_loop_range.set_description(f"Test {test}")
+                al_loop_range.set_description(f"Test {test}: Data size {train_x1.shape[0]}: ")
 
                 # Trigger training epoch
                 model.train(train_x1,train_x2,train_x2_image_counts, train_y)

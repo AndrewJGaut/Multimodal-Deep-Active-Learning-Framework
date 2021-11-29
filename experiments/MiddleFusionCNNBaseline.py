@@ -7,6 +7,7 @@ from test_framework.tester import Tester
 import numpy as np
 from utils.data_utils import get_kaggle_satellite_image_classification_dataset_as_numpy_arrays
 from active_learning import categorical_query_functions as query_functions
+import collections
 
 PATH_TO_DATA = "../data/kaggle_satellite_image_classification"
 active_learning_functions = [query_functions.RANDOM, query_functions.MIN_MAX, query_functions.MAX_ENTROPY, query_functions.MIN_MARGIN]
@@ -36,15 +37,15 @@ if __name__ == "__main__":
 
     tester_y_onehot = np.zeros((tester_y.size, 4))
     tester_y_onehot[np.arange(tester_y.size),tester_y] = 1
-    import collections
-    print(collections.Counter(tester_y))
-    print(collections.Counter(first_modality[1]))
+    print("distribution of samples over the entire dataset:",collections.Counter(tester_y))
+    # print(collections.Counter(first_modality[1]))
 
     # define tester
-    tester = Tester(tester_x1, tester_x2, x2_image_counts, tester_y_onehot, training_epochs=10, active_learning_loop_count=10)
+    tester = Tester(tester_x1, tester_x2, x2_image_counts, tester_y_onehot, training_epochs=1, active_learning_loop_count=1)
     tester.INITIAL_TRAIN_DATA_FRACTION = 0.05
 
     for i,active_learning_function in enumerate(active_learning_functions):
+        print(f"Active learning function: {active_learning_function_descriptions[i]}")
         # define model
         multimodal_model = MiddleFusionModel(active_learning_function=active_learning_function)
 
@@ -52,4 +53,6 @@ if __name__ == "__main__":
         tester.test_model(multimodal_model)
 
     # get results
+    print("")
+    print([mr.__dict__ for mr in tester.model_results])
     tester.plot_results()
