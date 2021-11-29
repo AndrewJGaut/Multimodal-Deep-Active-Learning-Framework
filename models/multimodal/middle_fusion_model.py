@@ -113,37 +113,18 @@ class MiddleFusionNet(torch.nn.Module):
         x1_features = self.avgpool(x1_features)
         x1_features = torch.flatten(x1_features, 1)
         x1_embeddings = self.classifier(x1_features)
-        print(x1_embeddings.size())
-
-        # x2_embeddings = []
-        # for count, x2_image_stack in zip(x2_image_counts,x2):
-        #     cur_x2_embeddings_list = []
-        #     for _,x2_image in zip(range(count),x2_image_stack): #doesn't do anything if count is 0
-        #         cur_x2_features = self.features(x2_image.unsqueeze(0))
-        #         cur_x2_features = self.avgpool(cur_x2_features)
-        #         cur_x2_features = torch.flatten(cur_x2_features, 1)
-        #         cur_x2_embeddings = self.classifier(cur_x2_features)
-        #         cur_x2_embeddings_list.append(cur_x2_embeddings)
-        #     if len(cur_x2_embeddings_list) > 0:
-        #         x2_embeddings.append(torch.mean(torch.stack(cur_x2_embeddings_list)))
-        #     else:
-        #         print(torch.zeros_like(x1_embeddings[0]).size)
-        #         x2_embeddings.append(torch.zeros(4096)))
-        # x2_embeddings = torch.stack(x2_embeddings)
 
         x2_embeddings = []
-        x2_embeddings_list = []
-        for x2_images in torch.swapaxes(x2,0,1):
-            cur_x2_features = self.features(x2_images)
-            cur_x2_features = self.avgpool(cur_x2_features)
-            cur_x2_features = torch.flatten(cur_x2_features, 1)
-            cur_x2_embeddings = self.classifier(cur_x2_features)
-            print(cur_x2_embeddings.size())
-            x2_embeddings_list.append(cur_x2_embeddings)
-        # x2_embeddings = torch.stack(x2_embeddings_list)
-        print(torch.stack(x2_embeddings_list).size())
-        x2_embeddings = torch.mean(torch.stack(x2_embeddings_list),dim=0)
-        print(x2_embeddings.size())
+        for count, x2_image_stack in zip(x2_image_counts,x2):
+            if count > 0:
+                cur_x2_features = self.features(x2_image_stack[0:count])
+                cur_x2_features = self.avgpool(cur_x2_features)
+                cur_x2_features = torch.flatten(cur_x2_features, 1)
+                cur_x2_embeddings = self.classifier(cur_x2_features)
+                x2_embeddings.append(torch.mean(cur_x2_embeddings,axis=0))
+            else:
+                x2_embeddings.append(torch.zeros(4096).to(device))
+        x2_embeddings = torch.stack(x2_embeddings)
 
         all_embeddings = torch.cat((x1_embeddings,x2_embeddings),1)
         output = self.final_linear(all_embeddings)
@@ -164,7 +145,7 @@ class MiddleFusionModel(ModelInterface):
         self._name = name
         self._details = details
 
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model.to(device)
         self._name = name
         self._details = details

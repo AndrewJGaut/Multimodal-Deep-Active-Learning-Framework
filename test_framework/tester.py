@@ -14,8 +14,11 @@ and evaluates each model.
 class Tester:
     '''
     Args:
-        x_data (np.ndarray):    The full set of dataset inputs. First axis is batch, other axes will be untouched
+        x1_data (np.ndarray):   The inputs for the first data modality. First axis is batch, other axes will be untouched
                                 and sent to models for training, predicting, querying as is.
+        x2_data (np.ndarray):   The inputs for the second data modality. First axis is batch, other axes will be untouched
+                                and sent to models for training, predicting, querying as is.
+        x2_image_counts (np.ndarray):    The number of images per example of the second modality. The only axis is batch.
         y_data (np.ndarray):    The full set of dataset outputs. First axis is batch, other axes will be untouched
                                 and sent to loss function as is.
     '''
