@@ -79,6 +79,7 @@ class Tester:
         model (ModelInterface): The model to test (wrapped in the model interface).
     '''
     def test_model(self, model:ModelInterface) -> None:
+        model.num_epochs = self.TRAINING_EPOCHS
         results = ModelResults(model)
 
         for test in range(self.TEST_REPEAT_COUNT):
@@ -103,16 +104,10 @@ class Tester:
             for al_loop in al_loop_range:
                 # Train Model on current training data
                 pre_train_time = time.time()
-                for epoch in range(self.TRAINING_EPOCHS):
-                    al_loop_range.set_description(f"Test {test}, Training Epoch {epoch}")
+                al_loop_range.set_description(f"Test {test}")
 
-                    # Shuffle training data for the epoch
-                    epoch_order = np.random.permutation(train_x.shape[0])
-                    train_x = train_x[epoch_order]
-                    train_y = train_y[epoch_order]
-
-                    # Trigger training epoch
-                    model.train(train_x, train_y)
+                # Trigger training epoch
+                model.train(train_x, train_y)
                 training_time = time.time() - pre_train_time
 
                 # Query model for samples to label

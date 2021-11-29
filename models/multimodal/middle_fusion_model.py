@@ -7,9 +7,7 @@ import time
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-def train_model_given_numpy_arrays(model, x1, x2, y, criterion, optimizer, num_epochs=25, batch_size=8, is_inception=False, verbose=True):
-    if is_inception:
-        raise NotImplementedError("training using tensors not supported for inception model")
+def train_model_given_numpy_arrays(model, x1, x2, y, criterion, optimizer, num_epochs=25, batch_size=8, verbose=True):
 
     # Convert data to data loader so that it isn't allocated on the GPU all at once.
     x1_tensor = torch.tensor(x1)
