@@ -4,7 +4,11 @@ from torchvision import datasets, transforms
 
 def get_kaggle_satellite_image_classification_dataset_as_numpy_arrays(
         data_dir="../data/kaggle_satellite_image_classification",
-        adjust_contrast=False):
+        adjust_contrast=False, adjust_contrast_and_crop_0_to_5_images=False):
+
+    if adjust_contrast and adjust_contrast_and_crop_0_to_5_images:
+        raise Exception("please only select one of 'adjust contrast' and 'adjust_contrast_and_crop_0_to_5_images'")
+
     def my_adjust_contrast():
         def _func(img):
             return transforms.functional.adjust_contrast(img, contrast_factor=0.8)
@@ -15,7 +19,12 @@ def get_kaggle_satellite_image_classification_dataset_as_numpy_arrays(
                                         transforms.ToTensor(),
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                                         my_adjust_contrast()])
-    else:
+    elif adjust_contrast_and_crop_0_to_5_images:
+        transform = transforms.Compose([transforms.CenterCrop(96),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                                        my_adjust_contrast()])
+    else: # no contrast
         transform = transforms.Compose([transforms.CenterCrop(224),
                                         transforms.ToTensor(),
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])

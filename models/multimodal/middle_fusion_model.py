@@ -7,14 +7,15 @@ import time
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-def train_model_given_numpy_arrays(model, x1, x2, y, criterion, optimizer, num_epochs=25, batch_size=8, verbose=True):
+def train_model_given_numpy_arrays(model, x1, x2, x2_image_counts, y, criterion, optimizer, num_epochs=25, batch_size=8, verbose=True):
 
     # Convert data to data loader so that it isn't allocated on the GPU all at once.
     x1_tensor = torch.tensor(x1)
     x2_tensor = torch.tensor(x2)
+    x2_image_counts_tensor = torch.tensor(x2_image_counts)
     y_tensor = torch.tensor(y)
     y_tensor = torch.argmax(y_tensor, 1)
-    dataset = TensorDataset(x1_tensor,x2_tensor,y_tensor)
+    dataset = TensorDataset(x1_tensor,x2_tensor,x2_image_counts_tensor,y_tensor)
     dataloader = DataLoader(dataset,batch_size=batch_size,num_workers=0,shuffle=True)
 
     since = time.time()
@@ -26,9 +27,10 @@ def train_model_given_numpy_arrays(model, x1, x2, y, criterion, optimizer, num_e
         running_loss = 0.0
         running_corrects = 0
 
-        for x1,x2, labels in dataloader:
+        for x1,x2,x2_image_counts, labels in dataloader:
             x1 = x1.to(device)
             x2 = x2.to(device)
+            x2_image_counts = x2_image_counts.to(device)
             labels = labels.to(device)
 
             # zero the parameter gradients
@@ -38,7 +40,7 @@ def train_model_given_numpy_arrays(model, x1, x2, y, criterion, optimizer, num_e
             # track history if only in train
             with torch.set_grad_enabled(True):
                 # Get model outputs and calculate loss
-                outputs = model(x1,x2)
+                outputs = model(x1,x2,x2_image_counts)
                 loss = criterion(outputs, labels)
 
                 _, preds = torch.max(outputs, 1)
@@ -106,13 +108,15 @@ class MiddleFusionNet(torch.nn.Module):
             # nn.Linear(4096, num_classes),
         )
         self.final_linear = nn.Linear(4096*2, num_classes)
-    def forward(self, x_satellite: torch.Tensor, x_streetlevel: torch.Tensor) -> torch.Tensor:
-        features_satellite = self.features(x_satellite)
+    def forward(self, x1: torch.Tensor, x2: torch.Tensor, x2_image_counts: torch.Tensor) -> torch.Tensor:
+        features_satellite = self.features(x1)
         features_satellite = self.avgpool(features_satellite)
         features_satellite = torch.flatten(features_satellite, 1)
         embeddings_satellite = self.classifier(features_satellite)
 
-        features_streetlevel = self.features(x_streetlevel)
+        # embeddings_streetlevel_list = []
+        # for i in ...
+        features_streetlevel = self.features(x2)
         features_streetlevel = self.avgpool(features_streetlevel)
         features_streetlevel = torch.flatten(features_streetlevel, 1)
         embeddings_streetlevel = self.classifier(features_streetlevel)
@@ -173,32 +177,35 @@ class MiddleFusionModel(ModelInterface):
     def details(self) -> str:
         return self.model.details()
 
-    def train(self, train_x: np.ndarray, train_y: np.ndarray) -> None:
-        x1,x2 = np.swapaxes(train_x,0,1)
-        self.model = train_model_given_numpy_arrays(self.model, x1, x2, train_y, self._criterion, self._optimizer,
+    def train(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray, y: np.ndarray) -> None:
+        # x1,x2 = np.swapaxes(train_x,0,1)
+        self.model = train_model_given_numpy_arrays(self.model, x1, x2, x2_image_counts, y,
+                                                    self._criterion, self._optimizer,
                                                     self.num_epochs, self.batch_size, verbose=self.train_verbose)
 
-    def predict(self, test_x: np.ndarray):
+    def predict(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray):
         self.model.eval()
-        x1,x2 = np.swapaxes(test_x,0,1)
+        # x1,x2 = np.swapaxes(test_x,0,1)
         x1 = torch.tensor(x1)
         x2 = torch.tensor(x2)
-        dataset = TensorDataset(x1,x2)
+        x2_image_counts = torch.tensor(x2_image_counts)
+        dataset = TensorDataset(x1,x2,x2_image_counts)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, num_workers=0, shuffle=False)
         preds_list = []
-        for (x1,x2,) in dataloader:
+        for (x1,x2,x2_image_counts,) in dataloader:
             x1 = x1.to(device)
             x2 = x2.to(device)
-            preds_list.append(self.model(x1,x2).cpu().detach().numpy())
+            x2_image_counts = x2_image_counts.to(device)
+            preds_list.append(self.model(x1,x2,x2_image_counts).cpu().detach().numpy())
         return np.vstack(preds_list)
 
-    def predict_proba(self, test_x: np.ndarray) -> np.ndarray:
+    def predict_proba(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray) -> np.ndarray:
         self.model.eval()
         softmax = lambda x: np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
-        softmax_outputs = softmax(self.predict(test_x))
+        softmax_outputs = softmax(self.predict(x1, x2, x2_image_counts))
         return softmax_outputs
 
-    def query(self, unlabeled_data: np.ndarray, labeling_batch_size: int) -> np.ndarray:
-        softmax_outputs = self.predict_proba(unlabeled_data)
+    def query(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray, labeling_batch_size: int) -> np.ndarray:
+        softmax_outputs = self.predict_proba(x1, x2, x2_image_counts)
         indices = self.active_learning_function(softmax_outputs, labeling_batch_size)
         return indices

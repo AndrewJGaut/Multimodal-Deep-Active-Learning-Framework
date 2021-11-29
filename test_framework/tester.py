@@ -19,7 +19,8 @@ class Tester:
         y_data (np.ndarray):    The full set of dataset outputs. First axis is batch, other axes will be untouched
                                 and sent to loss function as is.
     '''
-    def __init__(self, x_data:np.ndarray, y_data:np.ndarray, training_epochs=10, active_learning_loop_count=10) -> None:
+    def __init__(self, x1_data:np.ndarray, x2_data:np.ndarray, x2_image_counts:np.ndarray,
+                    y_data:np.ndarray, training_epochs=10, active_learning_loop_count=10) -> None:
         '''
         --- Default Config ---
         '''
@@ -62,13 +63,15 @@ class Tester:
         '''
 
         # Store original data
-        self.x_data = x_data
+        self.x1_data = x1_data
+        self.x2_data = x2_data
+        self.x2_image_counts = x2_image_counts
         self.y_data = y_data
 
         # Save shuffled data ordering for each test repeat planned
         self.data_orderings = []
         for _ in range(self.TEST_REPEAT_COUNT):
-            order = np.random.permutation(self.x_data.shape[0])
+            order = np.random.permutation(self.x1_data.shape[0])
             self.data_orderings.append(order)
 
 
@@ -84,18 +87,26 @@ class Tester:
 
         for test in range(self.TEST_REPEAT_COUNT):
             # Shuffle data and split into initial train data, 'unlabeled' train data, and test data.
-            shuffled_x_data = self.x_data[self.data_orderings[test]]
+            shuffled_x1_data = self.x1_data[self.data_orderings[test]]
+            shuffled_x2_data = self.x2_data[self.data_orderings[test]]
+            shuffled_x2_image_counts = self.x2_image_counts[self.data_orderings[test]]
             shuffled_y_data = self.y_data[self.data_orderings[test]]
 
-            data_size = self.x_data.shape[0]
+            data_size = self.x1_data.shape[0]
             test_data_size = round(data_size * self.TEST_DATA_FRACTION)
             initial_train_data_size = round((data_size - test_data_size) * self.INITIAL_TRAIN_DATA_FRACTION)
 
-            test_x = shuffled_x_data[:test_data_size]
+            test_x1 = shuffled_x1_data[:test_data_size]
+            test_x2 = shuffled_x2_data[:test_data_size]
+            test_x2_image_counts = shuffled_x2_image_counts[:test_data_size]
             test_y = shuffled_y_data[:test_data_size]
-            train_x = shuffled_x_data[test_data_size : test_data_size + initial_train_data_size]
+            train_x1 = shuffled_x1_data[test_data_size : test_data_size + initial_train_data_size]
+            train_x2 = shuffled_x2_data[test_data_size : test_data_size + initial_train_data_size]
+            train_x2_image_counts = shuffled_x2_image_counts[test_data_size : test_data_size + initial_train_data_size]
             train_y = shuffled_y_data[test_data_size : test_data_size + initial_train_data_size]
-            unlabeled_x = shuffled_x_data[test_data_size + initial_train_data_size :]
+            unlabeled_x1 = shuffled_x1_data[test_data_size + initial_train_data_size :]
+            unlabeled_x2 = shuffled_x2_data[test_data_size + initial_train_data_size :]
+            unlabeled_x2_image_counts = shuffled_x2_image_counts[test_data_size + initial_train_data_size :]
             unlabeled_y = shuffled_y_data[test_data_size + initial_train_data_size :]
 
             # Begin Active Learning Loops
@@ -107,29 +118,33 @@ class Tester:
                 al_loop_range.set_description(f"Test {test}")
 
                 # Trigger training epoch
-                model.train(train_x, train_y)
+                model.train(train_x1,train_x2,train_x2_image_counts, train_y)
                 training_time = time.time() - pre_train_time
 
                 # Query model for samples to label
                 pre_query_time = time.time()
-                label_indices = model.query(unlabeled_x, self.ACTIVE_LEARNING_BATCH_SIZE)
+                label_indices = model.query(unlabeled_x1,unlabeled_x2,unlabeled_x2_image_counts, self.ACTIVE_LEARNING_BATCH_SIZE)
                 querying_time = time.time() - pre_query_time
 
                 # Evaluate model on train and test data
-                train_performance = self.METRIC_FUNCTION(train_y, model.predict(train_x))
-                test_performance = self.METRIC_FUNCTION(test_y, model.predict(test_x))
+                train_performance = self.METRIC_FUNCTION(train_y, model.predict(train_x1,train_x2,train_x2_image_counts))
+                test_performance = self.METRIC_FUNCTION(test_y, model.predict(test_x1,test_x2,test_x2_image_counts))
 
                 # Save model results for this active learning loop
                 results.training_performance.append(train_performance)
                 results.test_performance.append(test_performance)
-                results.data_size.append(train_x.shape[0])
+                results.data_size.append(train_x1.shape[0])
                 results.training_time.append(training_time)
                 results.querying_time.append(querying_time)
 
                 # Add chosen samples to train data for next AL loop
-                train_x = np.concatenate([train_x, unlabeled_x[label_indices]], axis=0)
+                train_x1 = np.concatenate([train_x1, unlabeled_x1[label_indices]], axis=0)
+                train_x2 = np.concatenate([train_x2, unlabeled_x2[label_indices]], axis=0)
+                train_x2_image_counts = np.concatenate([train_x2_image_counts, unlabeled_x2_image_counts[label_indices]], axis=0)
                 train_y = np.concatenate([train_y, unlabeled_y[label_indices]], axis=0)
-                unlabeled_x = np.delete(unlabeled_x, label_indices, axis=0)
+                unlabeled_x1 = np.delete(unlabeled_x1, label_indices, axis=0)
+                unlabeled_x2 = np.delete(unlabeled_x2, label_indices, axis=0)
+                unlabeled_x2_image_counts = np.delete(unlabeled_x2_image_counts, label_indices, axis=0)
                 unlabeled_y = np.delete(unlabeled_y, label_indices, axis=0)
 
         # Save results
