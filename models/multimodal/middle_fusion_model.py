@@ -107,17 +107,17 @@ class MiddleFusionNet(torch.nn.Module):
             nn.Linear(4096, num_classes),
         )
     def forward(self, x_satellite: torch.Tensor, x_streetlevel: torch.Tensor) -> torch.Tensor:
-        features_satellite = self.features(x_satellite)
-        features_satellite = self.avgpool(features_satellite)
-        features_satellite = torch.flatten(features_satellite, 1)
+        self.features_satellite = self.features(x_satellite)
+        self.features_satellite = self.avgpool(self.features_satellite)
+        self.features_satellite = torch.flatten(self.features_satellite, 1)
 
-        features_streetlevel = self.features(x_streetlevel)
-        features_streetlevel = self.avgpool(features_streetlevel)
-        features_streetlevel = torch.flatten(features_streetlevel, 1)
+        self.features_streetlevel = self.features(x_streetlevel)
+        self.features_streetlevel = self.avgpool(self.features_streetlevel)
+        self.features_streetlevel = torch.flatten(self.features_streetlevel, 1)
         
-        all_features = torch.cat((features_satellite,features_streetlevel),1)
+        self.all_features = torch.cat((self.features_satellite,self.features_streetlevel),1)
 
-        output = self.classifier(all_features)
+        output = self.classifier(self.all_features)
         return output
     def details(self):
         return "a middle fusion model based on AlexNet"
