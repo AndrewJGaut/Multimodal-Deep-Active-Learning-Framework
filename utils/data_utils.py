@@ -20,8 +20,8 @@ def get_kaggle_satellite_image_classification_dataset_as_numpy_arrays(
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                                         my_adjust_contrast()])
     elif adjust_contrast_and_crop_0_to_5_images:
-        transform = transforms.Compose([transforms.CenterCrop(96),
-                                        transforms.ToTensor(),
+        transform = transforms.Compose([transforms.FiveCrop(64),
+                                        transforms.Lambda(lambda crops: torch.stack([transforms.ToTensor()(crop) for crop in crops])), # returns a 4D tensor
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                                         my_adjust_contrast()])
     else: # no contrast
