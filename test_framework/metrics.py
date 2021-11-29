@@ -27,7 +27,10 @@ Assumes y_actual entries are 1-hot arrays, and y_predicted entries are
 normalized probability arrays of the same length.
 '''
 def ACCURACY(y_actual:np.ndarray, y_predicted:np.ndarray) -> float:
+    print(y_actual.shape)
+    print(y_predicted.shape)
     y_prediction_probs = np.max(y_predicted, axis=-1, keepdims=True)
+    print(y_prediction_probs.shape)
     return np.mean(y_actual[y_predicted == y_prediction_probs])
 
 '''

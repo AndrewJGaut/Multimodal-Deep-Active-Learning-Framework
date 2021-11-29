@@ -21,9 +21,23 @@ if __name__ == "__main__":
     second_modality = get_kaggle_satellite_image_classification_dataset_as_numpy_arrays(PATH_TO_DATA, True)
     tester_x = np.stack((first_modality[0], second_modality[0]), axis=1)
     tester_y = first_modality[1]
+    order = np.random.permutation(len(tester_y))
+    tester_x = tester_x[order]
+    tester_y = tester_y[order]
+    tester_x = tester_x[:600]
+    tester_y = tester_y[:600]
+    print(tester_y[-1])
+
+    tester_y_onehot = np.zeros((tester_y.size, 4))
+    tester_y_onehot[np.arange(tester_y.size),tester_y] = 1
+    print(tester_y_onehot.shape)
+
+    import collections
+    print(collections.Counter(tester_y))
+    print(collections.Counter(first_modality[1]))
 
     # define tester
-    tester = Tester(tester_x, tester_y, training_epochs=3, active_learning_loop_count=16)
+    tester = Tester(tester_x, tester_y_onehot, training_epochs=2, active_learning_loop_count=5)
     tester.INITIAL_TRAIN_DATA_FRACTION = 0.05
 
     for i,active_learning_function in enumerate(active_learning_functions):

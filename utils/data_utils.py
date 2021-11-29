@@ -25,8 +25,8 @@ def get_kaggle_satellite_image_classification_dataset_as_numpy_arrays(
     dataset = datasets.ImageFolder(data_dir, transform=transform)
 
     all_data_dataloader = torch.utils.data.DataLoader(dataset, batch_size=len(dataset),
-                                                      num_workers=0, shuffle=False)
+                                                      num_workers=0, shuffle=True)
     x = next(iter(all_data_dataloader))[0].numpy()
     y = next(iter(all_data_dataloader))[1].numpy()
-
+    print(y)
     return x, y

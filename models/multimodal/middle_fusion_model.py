@@ -15,7 +15,7 @@ def train_model_given_numpy_arrays(model, x1, x2, y, criterion, optimizer, num_e
     x1_tensor = torch.tensor(x1)
     x2_tensor = torch.tensor(x2)
     y_tensor = torch.tensor(y)
-    # y_tensor = torch.argmax(y_tensor, 1)
+    y_tensor = torch.argmax(y_tensor, 1)
     dataset = TensorDataset(x1_tensor,x2_tensor,y_tensor)
     dataloader = DataLoader(dataset,batch_size=batch_size,num_workers=0,shuffle=True)
 
@@ -129,7 +129,7 @@ class MiddleFusionModel(ModelInterface):
     '''
     Instantiate the middle fusion model.
     '''
-    def __init__(self, active_learning_function=None,
+    def __init__(self, active_learning_function,
                  name=None, details=None,
                 num_epochs=3, batch_size=8, train_verbose=True,
                 query_function=None):
@@ -265,11 +265,10 @@ class MiddleFusionModel(ModelInterface):
         self.model.eval()
         softmax = lambda x: np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
         softmax_outputs = softmax(self.predict(test_x))
+        print(softmax_outputs)
         return softmax_outputs
 
     def query(self, unlabeled_data: np.ndarray, labeling_batch_size: int) -> np.ndarray:
-        if self.active_learning_function is None:
-            raise Exception("If you want to use the default multimodal query function, you need to supply an active learning function upon model instantiation.")
         softmax_outputs = self.predict_proba(unlabeled_data)
-        indices = self.query_function(softmax_outputs, labeling_batch_size)
+        indices = self.active_learning_function(softmax_outputs, labeling_batch_size)
         return indices
