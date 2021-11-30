@@ -1,6 +1,7 @@
 # Entries we added
 .idea/
 *.DS_Store
+.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

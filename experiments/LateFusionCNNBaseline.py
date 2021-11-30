@@ -1,3 +1,5 @@
+import sys
+sys.path.append("..")
 
 from models.multimodal.late_fusion_model import LateFusionModel
 from models.unimodal.squeezenet import SqueezeNet
@@ -9,7 +11,7 @@ import active_learning.categorical_query_functions as query_functions
 
 
 
-PATH_TO_DATA = "./data/kaggle_satellite_image_classification"
+PATH_TO_DATA = "../data/kaggle_satellite_image_classification"
 active_learning_functions = [query_functions.RANDOM, query_functions.MIN_MAX, query_functions.MAX_ENTROPY, query_functions.MIN_MARGIN]
 active_learning_function_descriptions = ["Random", "Min-Max", "Max-Ent", "Min-Margin"]
 
