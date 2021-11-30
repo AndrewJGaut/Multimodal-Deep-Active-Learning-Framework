@@ -34,7 +34,8 @@ TEST_DATA_FRACTION = 0.05
 
 class Experiment:
 
-    def __init__(self, models, active_learning_methods, test_data_fraction=0.05, final_model_layer_len=64,
+    def __init__(self, models, active_learning_methods, ,
+                 test_data_fraction=0.05, final_model_layer_len=64,
                  active_learning_batch_size=256, training_epochs=4, test_repeat_count=2):
         self.models = models
         self.active_learning_method = active_learning_methods
