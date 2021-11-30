@@ -5,6 +5,9 @@ import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 import time
 
+from active_learning.cluster_margin import *
+from active_learning.badge import *
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def train_model_given_numpy_arrays(model, x1, x2, x2_image_counts, y, criterion, optimizer, num_epochs=25, batch_size=8, verbose=True):
@@ -122,11 +125,10 @@ class MiddleFusionModel(ModelInterface):
     '''
     Instantiate the middle fusion model.
     '''
-    def __init__(self, active_learning_function,
+    def __init__(self, query_function_name,
                  name=None, details=None,
                 num_epochs=3, batch_size=8, train_verbose=True,
                 query_function=None):
-        self.active_learning_function = active_learning_function
         self.model = MiddleFusionNet(num_classes=4)
         self._name = name
         self._details = details
@@ -148,6 +150,36 @@ class MiddleFusionModel(ModelInterface):
 
         # store criterion
         self._criterion = nn.CrossEntropyLoss()
+
+
+
+        self.query_function_name = query_function_name
+        # For cluster-margin active learning algorithm, clusters must be
+        # saved between queries
+        if self.query_function_name == "CLUSTER_MARGIN":
+            raise NotImplementedError("Cluster margin is not yet implemented for late fusion")
+            """
+            self.cluster_margin = ClusterMarginQueryFunction(
+                self.model, None, # [self.model.post_fusion_layer.weight],
+                margin_batch_size=2 * self.batch_size,
+                target_batch_size=self.batch_size
+            )
+            self.badge = None
+            """
+        elif self.query_function_name == "BADGE":
+            self.badge = BADGEQueryFunction(
+                self.model, None,
+                margin_batch_size=2 * self.batch_size,
+                target_batch_size=self.batch_size
+            )
+            self.cluster_margin = None
+        else:
+            self.cluster_margin = None
+            self.badge = None
+
+
+
+
 
 
     # IDENTIFIER METHODS
@@ -197,6 +229,8 @@ class MiddleFusionModel(ModelInterface):
         return softmax_outputs
 
     def query(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray, labeling_batch_size: int) -> np.ndarray:
+        if self.badge is not None:
+            return self.badge.query(unlabeled_data)
         softmax_outputs = self.predict_proba(x1, x2, x2_image_counts)
         indices = self.active_learning_function(softmax_outputs, labeling_batch_size)
         return indices
