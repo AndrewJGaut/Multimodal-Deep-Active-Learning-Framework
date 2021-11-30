@@ -20,7 +20,7 @@ class ClusterMethod:
         """
         pass
 
-    def conver_to_numpy(self, X):
+    def convert_to_numpy(self, X):
         return X.cpu().detach().numpy()
 
 
@@ -51,7 +51,7 @@ class GMM(ClusterMethod):
 
     def cluster(self, X, n_clusters=None):
         # first conver the torch tensor into np array
-        np_X = self.conver_to_numpy(X)
+        np_X = self.convert_to_numpy(X)
 
         if n_clusters is None:
             n_clusters = self.n_clusters
@@ -71,7 +71,7 @@ class KMeansPlusPlus(ClusterMethod):
 
     def cluster(self, X, n_clusters=None):
         # first conver the torch tensor into np array
-        X = X.cpu().detach().numpy()
+        np_X = self.convert_to_numpy(X)
 
         if n_clusters is None:
             n_clusters = self.n_clusters
@@ -79,7 +79,7 @@ class KMeansPlusPlus(ClusterMethod):
         # now, call fit
         kmeans = KMeans(init='k-means++',
                         n_clusters=self.n_clusters)  # NOTE: init=random here implies that we AREN'T using kmeans++
-        labels = kmeans.fit_predict(X)
+        labels = kmeans.fit_predict(np_X)
 
         # might want to convert this into a torch tensor?
         return labels
@@ -91,7 +91,7 @@ class KMeans(ClusterMethod):
 
     def cluster(self, X, n_clusters=None):
         # first conver the torch tensor into np array
-        X = X.cpu().detach().numpy()
+        np_X = self.convert_to_numpy(X)
 
         if n_clusters is None:
             n_clusters = self.n_clusters
@@ -99,7 +99,7 @@ class KMeans(ClusterMethod):
         # now, call fit
         kmeans = KMeans(init='random',
                         n_clusters=self.n_clusters)  # NOTE: init=random here implies that we AREN'T using kmeans++
-        labels = kmeans.fit_predict(X)
+        labels = kmeans.fit_predict(np_X)
 
         # might want to convert this into a torch tensor?
         return labels
