@@ -68,7 +68,7 @@ class ClusterMarginQueryFunction:
 
         # Find clusters
         n_clusters = round(data_len * (self.target_batch_size / self.margin_batch_size))
-        cluster_ids = self.cluster_method(embeddings, n_clusters)
+        cluster_ids = self.cluster_method.cluster(embeddings, n_clusters)
 
         # Save cluster assignments
         self.sample_to_cluster_id = {}

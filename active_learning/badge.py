@@ -47,6 +47,6 @@ class BADGEQueryFunction:
 
     def query(self, unlabeled_samples: np.ndarray) -> np.ndarray:
         embeddings, _ = compute_gradient_embeddings(self.model, self.last_layer_model_params, unlabeled_samples)
-        sample_indices = self.sample_method(embeddings, self.target_batch_size)
+        sample_indices = self.sample_method.sample(embeddings, self.target_batch_size)
 
         return sample_indices

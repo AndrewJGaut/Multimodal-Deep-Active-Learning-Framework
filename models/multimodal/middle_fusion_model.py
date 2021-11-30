@@ -254,19 +254,47 @@ class MiddleFusionModel(ModelInterface):
         softmax_outputs = softmax(self.predict(x1, x2, x2_image_counts))
         return softmax_outputs
 
+    """
     def query(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray, labeling_batch_size: int) -> np.ndarray:
         softmax_outputs = self.predict_proba(x1, x2, x2_image_counts)
         indices = self.active_learning_function(softmax_outputs, labeling_batch_size)
         return indices
+    """
+    def query(self, unlabeled_data: np.ndarray, labeling_batch_size: int) -> np.ndarray:
+        #softmax = lambda x: np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
+        #softmax_outputs = softmax(self.predict(unlabeled_data))
+
+        if self.query_function_name == "RANDOM":
+            data_size = unlabeled_data[0].shape[0]
+            return np.random.choice(np.arange(data_size), size=labeling_batch_size, replace=False)
+
+        if self.query_function_name == "MIN_MAX":
+            return MIN_MAX(self.predict(unlabeled_data), labeling_batch_size)
+
+        if self.query_function_name == "MIN_MARGIN":
+            return MIN_MARGIN(self.predict(unlabeled_data), labeling_batch_size)
+
+        if self.query_function_name == "MAX_ENTROPY":
+            return MAX_ENTROPY(self.predict(unlabeled_data), labeling_batch_size)
+
+        if self.query_function_name == "CLUSTER_MARGIN":
+            return self.cluster_margin.query(unlabeled_data)
+
+        if self.query_function_name == "BADGE":
+            return self.badge.query(unlabeled_data)
+
+        raise ValueError(f"Unrecognized query function name: {self.query_function_name}")
 
 
 class ActiveLearningModel(ModelInterface):
     def __init__(self, query_function_name, feature_extract=True,
                  num_epochs=8, batch_size=32, train_verbose=True):
 
-        model_ft, input_size = initialize_model("squeezenet", 4, feature_extract, use_pretrained=True)
-        self.model = model_ft
-        self.model.to(device)
+        #model_ft, input_size = initialize_model("squeezenet", 4, feature_extract, use_pretrained=True)
+        self.model = MiddleFusionModel #model_ft
+        #self.model.to(device)
+
+        self.query_function_name = query_function_name
 
         # Gather the parameters to be optimized/updated in this run. If we are
         #  finetuning we will be updating all parameters. However, if we are

@@ -213,7 +213,7 @@ class Tester:
 
         # Save plots
         plt.savefig(plot_savename)
-        plt.show()
+        #plt.show()
 
 
 

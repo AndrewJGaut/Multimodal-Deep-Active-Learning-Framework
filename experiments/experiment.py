@@ -91,6 +91,7 @@ class Experiment:
         # Convert y to one-hot array
         y_all = torch.eye(self.num_classes)[y_all]
 
+        #return main_image_all.numpy()[:600], secondary_images_all.numpy()[:600], y_all.numpy()[:600]
         return main_image_all.numpy(), secondary_images_all.numpy(), y_all.numpy()
 
 
@@ -98,8 +99,8 @@ class Experiment:
         return os.path.join("outputs",
                             f"{model_name}_{query_function_name}.png")
 
-    def plot(self, model_name, active_learning_method):
-        outfile_path = self.get_plot_name(model_name, active_learning_method)
+    def plot(self, outfile_path): #model_name, active_learning_method):
+        #outfile_path = self.get_plot_name(model_name, active_learning_method)
         Path('/'.join(outfile_path.split('/')[:-1])).mkdir(parents=True, exist_ok=True)  # create directory if necessary
         # plot the file
         self.tester.plot_results(plot_savename=outfile_path)
@@ -120,10 +121,13 @@ class Experiment:
             for query_function_name in self.query_function_names:
                 try:
                     curr_model = model(query_function_name)
+                    curr_model_outfile_name = self.get_plot_name(curr_model.name(), query_function_name)
+
+                    curr_model._name = query_function_name # this is so that tester will plot it with the correct name
                     print("working on {}".format(curr_model.name()))
                     self.tester.test_model(curr_model)
-                    self.plot(curr_model.name(), query_function_name)
+                    self.plot(curr_model_outfile_name)
                 except Exception as e:
                     print(f"Got exception {e} for model {curr_model.name()} with stack trace:\n{traceback.print_exc()}")
 
-            plt.clear()
+            plt.clf()

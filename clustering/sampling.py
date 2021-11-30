@@ -8,9 +8,9 @@ class SampleMethod:
         self.method_name = method_name
         self.n_samples = n_samples
 
-    def sample(self, X, n_samples=None):
+    def sample(self, np_X, n_samples=None):
         """
-        :param X (torch.tensor): the points to sample from
+        :param X  WRONG! this is an np.ndarray. #(torch.tensor): the points to sample from
         :param n_samples (int): the number of points to sample
         :return: The sampled points. These should be selected for by balancing both diversity and magnitude
         """
@@ -22,7 +22,7 @@ class KMeansPlusPlusSeeding(SampleMethod):
         super().__init__("KMeansPlusPlusSeeding", n_samples)
 
 
-    def sample(self, X, n_samples=None):
+    def sample(self, np_X, n_samples=None):
         if n_samples is None:
             n_samples = self.n_samples
 
@@ -32,6 +32,7 @@ class KMeansPlusPlusSeeding(SampleMethod):
         # for the first sample, just get a random point in X
         # keep in mind that X is of shape (n_examples, n_dimension_in_grad_embedding)
         # so the cluster points are the ROWS of X.
+        X = torch.from_numpy(np_X)
         centers = X[torch.randint(low=0, high=X.shape[0], size=(1,))].reshape(1, 1, -1)
         center_indices = list()
 
@@ -59,12 +60,13 @@ class WeightedKMeansSampling(SampleMethod):
         super().__init__("WeightedKMeansSampling", n_samples)
 
 
-    def sample(self, X, n_samples=None):
+    def sample(self, np_X, n_samples=None):
         if n_samples is None:
             n_samples = self.n_samples
 
         if n_samples == 0:
             return None
+        X = torch.from_numpy(np_X)
 
         weights = torch.norm(X,dim=1).cpu().detach().numpy()
         kmeans_model = KMeans(n_clusters=n_samples)
