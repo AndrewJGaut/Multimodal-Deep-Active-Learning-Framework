@@ -7,7 +7,7 @@ import sklearn
 import random
 import torch
 import torch.nn as nn
-from clustering.cluster import *
+from clustering.sampling import *
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -29,34 +29,13 @@ class BADGEQueryFunction:
     '''
 
     def __init__(self, model: nn.Module, last_layer_model_params: nn.Parameter, margin_batch_size: int,
-                 target_batch_size: int, cluster_method: ClusterMethod) -> None:
+                 target_batch_size: int, sample_method: SampleMethod) -> None:
         self.model = model
         self.last_layer_model_params = last_layer_model_params
         self.margin_batch_size = margin_batch_size
         self.target_batch_size = target_batch_size
-        self.cluster_method = cluster_method
+        self.sample_method = sample_method
 
-        # For storing cluster membership {np array byte string -> int}
-        self.sample_to_cluster_id = {}
-
-    '''
-    Update stored clusters which will be used to enforce diversity
-    Args:
-        samples (np.ndarray):   All currently unlabeled samples.
-    '''
-
-    def compute_clusters(self, samples: np.ndarray) -> None:
-        # Find embeddings
-        embeddings = compute_gradient_embeddings(self.model, self.last_layer_model_params, samples)
-
-        # Find clusters
-        n_clusters = len(samples) * (self.target_batch_size / self.margin_batch_size)
-        cluster_ids = self.cluster_method(embeddings, n_clusters)
-
-        # Save cluster assignments
-        self.sample_to_cluster_id = {}
-        for i in range(len(samples)):
-            self.sample_to_cluster_id[samples[i].tobytes()] = cluster_ids[i]
 
     '''
     Active Learning query function, returns a subset of the given unlabeled samples
