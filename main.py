@@ -9,6 +9,7 @@ if __name__ == '__main__':
     models = [MultiModalLateFusionModelInterface, ActiveLearningModel]
     query_function_names = ["RANDOM", "MIN_MAX", "MIN_MARGIN", "MAX_ENTROPY", "CLUSTER_MARGIN", "BADGE"]
     exp = Experiment(models=models, query_function_names=query_function_names)
+    exp.run_experiments()
 
 
 

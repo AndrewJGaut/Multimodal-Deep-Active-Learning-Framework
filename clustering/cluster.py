@@ -2,7 +2,7 @@
 Define a parent class for all the clustering methods so that they have a consistent API.
 """
 from sklearn.cluster import AgglomerativeClustering
-from sklearn.cluster import GaussianMixture
+from sklearn.mixture import GaussianMixture
 from sklearn.cluster import KMeans
 
 class ClusterMethod:
@@ -25,11 +25,11 @@ class ClusterMethod:
 
 
 class AgglomerativeCluster(ClusterMethod):
-    def __init__(self, n_clusters=10, linkage='average'):
-        super("GMM", n_clusters).__init__()
+    def __init__(self, n_clusters=None, linkage='average'):
+        super().__init__("AgglomerativeClustering", n_clusters)
         self.linkage = linkage
 
-    def cluster(self, X, n_clusters=None):
+    def cluster(self, X, n_clusters=10):
         # first conver the torch tensor into np array
         np_X = self.conver_to_numpy(X)
 
@@ -47,7 +47,7 @@ class AgglomerativeCluster(ClusterMethod):
 
 class GMM(ClusterMethod):
     def __init__(self, n_clusters=10):
-        super("GMM", n_clusters).__init__()
+        super().__init__("GMM", n_clusters)
 
     def cluster(self, X, n_clusters=None):
         # first conver the torch tensor into np array
@@ -67,7 +67,7 @@ class GMM(ClusterMethod):
 
 class KMeansPlusPlus(ClusterMethod):
     def __init__(self, n_clusters=10):
-        super("KMeans++", n_clusters).__init__()
+        super().__init__("KMeans++", n_clusters)
 
     def cluster(self, X, n_clusters=None):
         # first conver the torch tensor into np array
@@ -87,7 +87,7 @@ class KMeansPlusPlus(ClusterMethod):
 
 class KMeans(ClusterMethod):
     def __init__(self, n_clusters=10):
-        super("KMeans", n_clusters).__init__()
+        super().__init__("KMeans", n_clusters)
 
     def cluster(self, X, n_clusters=None):
         # first conver the torch tensor into np array

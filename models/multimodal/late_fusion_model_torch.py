@@ -192,7 +192,7 @@ class MultiModalLateFusionModelInterface(ModelInterface):
 
     def predict(self, test_x: List[np.ndarray]) -> np.ndarray:
         data_len = test_x[0].shape[0]
-        output = np.zeros((data_len, self.NUM_CLASSES))
+        output = np.zeros((data_len, self.model.NUM_CLASSES))
 
         with torch.no_grad():
             # Extract specific data modes

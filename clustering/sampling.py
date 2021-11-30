@@ -18,8 +18,8 @@ class SampleMethod:
 
 
 class KMeansPlusPlusSeeding(SampleMethod):
-    def __init__(self, n_samples):
-        super("KMeansPlusPlusSeeding", n_samples).__init__()
+    def __init__(self, n_samples=None):
+        super().__init__("KMeansPlusPlusSeeding", n_samples)
 
 
     def sample(self, X, n_samples=None):
@@ -55,8 +55,8 @@ class WeightedKMeansSampling(SampleMethod):
      See Diverse mini-batch Active Learning (https://arxiv.org/pdf/1901.05954.pdf)
     """
 
-    def __init__(self, n_samples):
-        super("WeightedKMeansSampling", n_samples).__init__()
+    def __init__(self, n_samples=None):
+        super().__init__("WeightedKMeansSampling", n_samples)
 
 
     def sample(self, X, n_samples=None):

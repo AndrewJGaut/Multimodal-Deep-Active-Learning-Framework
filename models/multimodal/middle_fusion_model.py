@@ -32,7 +32,7 @@ sys.path.append("..")
 from test_framework.model_interface import ModelInterface
 from test_framework.tester import Tester
 from utils.data_utils import get_kaggle_satellite_image_classification_dataset_as_numpy_arrays
-import active_learning.categorical_query_functions import *
+from active_learning.categorical_query_functions import *
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
