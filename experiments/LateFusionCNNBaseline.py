@@ -23,7 +23,7 @@ if __name__ == "__main__":
     tester_y = first_modality[1]
 
     # define tester
-    tester = Tester(tester_x, tester_y, training_epochs=3, active_learning_loop_count=16)
+    tester = Tester([tester_x], tester_y, training_epochs=3, active_learning_loop_count=16)
     tester.INITIAL_TRAIN_DATA_FRACTION = 0.05
 
     for i,active_learning_function in enumerate(active_learning_functions):

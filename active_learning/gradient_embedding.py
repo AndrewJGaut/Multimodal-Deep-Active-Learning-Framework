@@ -1,7 +1,9 @@
 from typing import List
 import numpy as np
+from collections import deque
 import torch
 import torch.nn as nn
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 '''
 Utility for creating gradient embeddings as detailed in BADGE and Cluster-Margin algorithms.
@@ -21,27 +23,39 @@ Args:
                                         as output (per sample).
     target_parameters ([nn.Parameter]): List of parameters to compute gradients for. Generally should be parameters of
                                         last feature layer.
-    samples (torch.FloatTensor):        Batch of samples which will be transformed into embeddings. Must be a valid input
-                                        for model.
+    model_inputs ([np.ndarray]):        List of batch of samples in each mode which will be transformed into embeddings. Must be a valid input
+                                        for model. List elements will be unpacked when input into model.
 Returns:
-    (torch.FloatTensor):                Embedding for each sample. Shape = (batch_size, flattened_param_size)
+    (np.ndarray):                       Embedding for each sample. Shape = (batch_size, flattened_param_size)
+    (np.ndarray):                       List mapping embedding indices to their corresponding parameter indices
 '''
-def compute_gradient_embeddings(model: nn.Module, target_parameters: List[nn.Parameter], samples: torch.FloatTensor) -> torch.FloatTensor:
-    embedding_len = 0
-    for p in target_parameters:
-        embedding_len += np.prod(p.shape)
+def compute_gradient_embeddings(model: nn.Module, target_parameters: List[nn.Parameter], model_inputs: List[np.ndarray]) -> np.ndarray:
+    target_parameters = list(target_parameters) # Ensure target_parameters is in list format, not Generator format
+    
+    embedding_reversal_map = [
+        [i, *np.unravel_index(j, target_parameters[i].shape)]
+        for i in range(len(target_parameters))
+        for j in range(np.prod(target_parameters[i].shape))
+    ]
+    embedding_len = sum(np.prod(p.shape) for p in target_parameters)
 
-    embeddings = torch.zeros(samples.shape[0], embedding_len)
-    for i in range(samples.shape[0]):
-        sample = samples[i]
+    data_len = model_inputs[0].shape[0]
+
+    embeddings = np.zeros((data_len, embedding_len))
+    for i in range(data_len):
+        # Convert individual sample to gpu tensor, as a batch of 1 sample
+        input = [
+            torch.from_numpy(input_mode[i:i+1]).to(DEVICE)
+            for input_mode in model_inputs
+        ]
 
         model.zero_grad()
-        assumed_sample_loss = torch.log(torch.max(model(sample.reshape(1, *sample.shape))))
+        assumed_sample_loss = -torch.log(torch.max(model(*input)))
         sample_grads = torch.autograd.grad(assumed_sample_loss, target_parameters)
         flattened_sample_grads = torch.cat([g.reshape(-1) for g in sample_grads])
-        embeddings[i, :] = flattened_sample_grads
+        embeddings[i, :] = flattened_sample_grads.detach().cpu().numpy()
 
-    return embeddings
+    return embeddings, embedding_reversal_map
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
-from typing import Tuple
+from collections import deque
+from typing import Tuple, List
 import numpy as np
-import sklearn
+from sklearn.cluster import AgglomerativeClustering
 import random
 import torch
 import torch.nn as nn
@@ -49,31 +50,50 @@ class ClusterMarginQueryFunction:
     '''
     Update stored clusters which will be used to enforce diversity
     Args:
-        samples (np.ndarray):   All currently unlabeled samples.
+        model_inputs ([np.ndarray]):    Set of model inputs to cluster (over multiple modalities)
     '''
-    def compute_clusters(self, samples: np.ndarray) -> None:
+    def compute_clusters(self, model_inputs: List[np.ndarray]) -> None:
+        data_len = len(model_inputs[0])
+    
         # Find embeddings
-        embeddings = compute_gradient_embeddings(self.model, self.last_layer_model_params, samples)
+        embeddings, _ = compute_gradient_embeddings(self.model, self.last_layer_model_params, model_inputs)
         
         # Find clusters
-        n_clusters = len(samples) * (self.target_batch_size / self.margin_batch_size)
+        n_clusters = round(data_len * (self.target_batch_size / self.margin_batch_size))
         cluster_ids = cluster_embeddings(embeddings, n_clusters)
         
         # Save cluster assignments
         self.sample_to_cluster_id = {}
-        for i in range(len(samples)):
-            self.sample_to_cluster_id[samples[i].tobytes()] = cluster_ids[i]
+        for i in range(data_len):
+            self.sample_to_cluster_id[model_inputs[0][i].tobytes()] = cluster_ids[i]
     
     '''
     Active Learning query function, returns a subset of the given unlabeled samples
     Args:
-        unlabeled_samples (np.ndarray): List of unlabeled samples
+        unlabeled_samples ([np.ndarray]):   List of full unlabeled batch for each input modality.
     Returns:
-        batch_to_label (np.ndarray):    Subset of given unlabeled samples chosen for labeling
+        batch_to_label (np.ndarray):        Subset of given unlabeled samples chosen for labeling
     '''
-    def query(self, unlabeled_samples: np.ndarray) -> np.ndarray:
+    def query(self, unlabeled_samples: List[np.ndarray]) -> np.ndarray:
+        # Compute clusters if not already computed
+        if not len(self.sample_to_cluster_id):
+            self.compute_clusters(unlabeled_samples)
+
         # Find current output probabilities
-        outputs = self.model(torch.tensor(unlabeled_samples).to(DEVICE)).detach().cpu().numpy()
+        MINIBATCH_SIZE = 32
+        minibatch_outputs = deque()
+        data_len = len(unlabeled_samples[0])
+        batch_start = 0
+        while batch_start < data_len:
+            current_minibatch_size = min(MINIBATCH_SIZE, data_len - batch_start)
+            minibatch_input = [
+                torch.from_numpy(mode[batch_start : batch_start + current_minibatch_size]).to(DEVICE)
+                for mode in unlabeled_samples
+            ]
+            minibatch_output = self.model(*minibatch_input).detach().cpu().numpy()
+            minibatch_outputs.append(minibatch_output)
+            batch_start += current_minibatch_size
+        outputs = np.concatenate(list(minibatch_outputs), axis=0)
         
         # Select margin batch (most uncertain samples)
         margin_batch_indices = MIN_MARGIN(outputs, self.margin_batch_size)
@@ -81,12 +101,12 @@ class ClusterMarginQueryFunction:
         # Sort all chosen samples into their clusters
         clusters = {}
         for sample_ind in margin_batch_indices:
-            sample = unlabeled_samples[sample_ind]
+            sample_key = unlabeled_samples[0][sample_ind].tobytes()
             
-            if sample.tobytes() not in self.sample_to_cluster_id:
+            if sample_key not in self.sample_to_cluster_id:
                 raise ValueError("Given unlabeled input not in cluster member dict")
 
-            cluster_id = self.sample_to_cluster_id[sample.tobytes()]
+            cluster_id = self.sample_to_cluster_id[sample_key]
             
             if cluster_id not in clusters:
                 clusters[cluster_id] = []
@@ -97,7 +117,7 @@ class ClusterMarginQueryFunction:
             random.shuffle(sample_indices)
 
         # Sort clusters by size
-        sorted_cluster_indices = list(clusters.keys()).sort(key = lambda cluster_id : len(clusters[cluster_id]))
+        sorted_cluster_indices = sorted(list(clusters.keys()), key = lambda cluster_id : len(clusters[cluster_id]))
 
         # Fill labeling batch by iterating through clusters in ascending size order
         cluster_loop_counter = 0 # Counts the number of times we have iterated through all clusters
@@ -116,20 +136,6 @@ class ClusterMarginQueryFunction:
 # --- Helper Functions ---
 
 '''
-Turns a set of points into embeddings based on the gradient of imagined loss with respect to
-parameters of the penultimate layer in the model.
-Args:
-    model (nn.Module):                          Pytorch model which converts batch of inputs
-                                                into batch of normalized class probabilities
-    last_layer_model_params (nn.Parameter):     Reference to final layer parameters in model
-    samples (np.ndarray):                       Set of samples to create embeddings for
-Returns:
-    embeddings (np.ndarray):                    Embeddings for each element of points
-'''
-def embed_points(model: nn.Module, last_layer_model_params: nn.Parameter, samples: np.ndarray) -> np.ndarray:
-    raise NotImplementedError
-
-'''
 Performs Hierarchical Agglomerative Clustering with Average-Linking on the given embeddings,
 returning the cluster id corresponding to each point, as well as the total number of clusters.
 Args:
@@ -140,7 +146,7 @@ Returns:
     cluster_membership (np.ndarray):    Integer cluster indices for each element of embeddings
 '''
 def cluster_embeddings(embeddings: np.ndarray, n_clusters: int) -> Tuple[np.ndarray, int]:
-    return sklearn.cluster.AgglomerativeClustering(n_clusters = n_clusters, linkage = 'average').fit(embeddings).labels_
+    return AgglomerativeClustering(n_clusters = n_clusters, linkage = 'average').fit(embeddings).labels_
 
 '''
 
