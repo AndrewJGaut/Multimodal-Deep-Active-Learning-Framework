@@ -41,7 +41,7 @@ if __name__ == "__main__":
     # print(collections.Counter(first_modality[1]))
 
     # define tester
-    tester = Tester(tester_x1, tester_x2, x2_image_counts, tester_y_onehot, training_epochs=10, active_learning_loop_count=10)
+    tester = Tester([tester_x1, tester_x2, x2_image_counts], tester_y_onehot, training_epochs=10, active_learning_loop_count=10)
     tester.INITIAL_TRAIN_DATA_FRACTION = 0.05
 
     for i,active_learning_function in enumerate(active_learning_functions):

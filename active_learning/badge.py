@@ -46,42 +46,7 @@ class BADGEQueryFunction:
     '''
 
     def query(self, unlabeled_samples: np.ndarray) -> np.ndarray:
-        # Find current output probabilities
-        outputs = self.model(torch.tensor(unlabeled_samples).to(DEVICE)).detach().cpu().numpy()
+        embeddings, _ = compute_gradient_embeddings(self.model, self.last_layer_model_params, unlabeled_samples)
+        sample_indices = self.sample_method(embeddings, self.target_batch_size)
 
-        # Select margin batch (most uncertain samples)
-        margin_batch_indices = MIN_MARGIN(outputs, self.margin_batch_size)
-
-        # Sort all chosen samples into their clusters
-        clusters = {}
-        for sample_ind in margin_batch_indices:
-            sample = unlabeled_samples[sample_ind]
-
-            if sample.tobytes() not in self.sample_to_cluster_id:
-                raise ValueError("Given unlabeled input not in cluster member dict")
-
-            cluster_id = self.sample_to_cluster_id[sample.tobytes()]
-
-            if cluster_id not in clusters:
-                clusters[cluster_id] = []
-            clusters[cluster_id].append(sample_ind)
-
-        # Shuffle all clusters
-        for cluster_id, sample_indices in clusters.items():
-            random.shuffle(sample_indices)
-
-        # Sort clusters by size
-        sorted_cluster_indices = list(clusters.keys()).sort(key=lambda cluster_id: len(clusters[cluster_id]))
-
-        # Fill labeling batch by iterating through clusters in ascending size order
-        cluster_loop_counter = 0  # Counts the number of times we have iterated through all clusters
-        label_batch = []
-        while len(label_batch) < self.target_batch_size:
-            for cluster_ind in sorted_cluster_indices:
-                if cluster_loop_counter < len(clusters[cluster_ind]):
-                    label_batch.append(clusters[cluster_ind][cluster_loop_counter])
-                    if len(label_batch) >= self.target_batch_size:
-                        break
-            cluster_loop_counter += 1
-
-        return np.array(label_batch)
+        return sample_indices

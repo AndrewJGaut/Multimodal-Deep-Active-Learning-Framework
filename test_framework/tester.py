@@ -1,4 +1,5 @@
 import numpy as np
+from typing import List
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
 import time
@@ -14,16 +15,13 @@ and evaluates each model.
 class Tester:
     '''
     Args:
-        x1_data (np.ndarray):   The inputs for the first data modality. First axis is batch, other axes will be untouched
-                                and sent to models for training, predicting, querying as is.
-        x2_data (np.ndarray):   The inputs for the second data modality. First axis is batch, other axes will be untouched
-                                and sent to models for training, predicting, querying as is.
-        x2_image_counts (np.ndarray):    The number of images per example of the second modality. The only axis is batch.
+        x_data ([np.ndarray]):  List of required input modes. Each element of list is a numpy array with its first axis as
+                                batch, and all other axes will be untouched and passed directly to models for training,
+                                 testing and querying. Each element is assumed to have the same first axis length.
         y_data (np.ndarray):    The full set of dataset outputs. First axis is batch, other axes will be untouched
                                 and sent to loss function as is.
     '''
-    def __init__(self, x1_data:np.ndarray, x2_data:np.ndarray, x2_image_counts:np.ndarray,
-                    y_data:np.ndarray, training_epochs=10, active_learning_loop_count=10) -> None:
+    def __init__(self, x_data:List[np.ndarray], y_data:np.ndarray, training_epochs=10, active_learning_loop_count=10) -> None:
         '''
         --- Default Config ---
         '''
@@ -66,15 +64,13 @@ class Tester:
         '''
 
         # Store original data
-        self.x1_data = x1_data
-        self.x2_data = x2_data
-        self.x2_image_counts = x2_image_counts
+        self.x_data = x_data
         self.y_data = y_data
 
         # Save shuffled data ordering for each test repeat planned
         self.data_orderings = []
         for _ in range(self.TEST_REPEAT_COUNT):
-            order = np.random.permutation(self.x1_data.shape[0])
+            order = np.random.permutation(self.x_data[0].shape[0])
             self.data_orderings.append(order)
 
 
@@ -85,32 +81,49 @@ class Tester:
         model (ModelInterface): The model to test (wrapped in the model interface).
     '''
     def test_model(self, model:ModelInterface) -> None:
-        model.num_epochs = self.TRAINING_EPOCHS
-        results = ModelResults(model)
+        results = ModelResults(model, self.TEST_REPEAT_COUNT, self.ACTIVE_LEARNING_LOOP_COUNT)
+
+        # Ensure we have enough data orderings for the test
+        if len(self.data_orderings) < self.TEST_REPEAT_COUNT:
+            for _ in range(self.TEST_REPEAT_COUNT - len(self.data_orderings)):
+                order = np.random.permutation(self.x_data[0].shape[0])
+                self.data_orderings.append(order)
 
         for test in range(self.TEST_REPEAT_COUNT):
+            # Reset model if there are multiple tests
+            if test > 0:
+                model.reset()
+
             # Shuffle data and split into initial train data, 'unlabeled' train data, and test data.
-            shuffled_x1_data = self.x1_data[self.data_orderings[test]]
-            shuffled_x2_data = self.x2_data[self.data_orderings[test]]
-            shuffled_x2_image_counts = self.x2_image_counts[self.data_orderings[test]]
+            shuffled_x_data = [
+                x_mode[self.data_orderings[test]]
+                for x_mode in self.x_data
+            ]
             shuffled_y_data = self.y_data[self.data_orderings[test]]
 
-            data_size = self.x1_data.shape[0]
+            data_size = self.x_data[0].shape[0]
             test_data_size = round(data_size * self.TEST_DATA_FRACTION)
             initial_train_data_size = round((data_size - test_data_size) * self.INITIAL_TRAIN_DATA_FRACTION)
 
-            test_x1 = shuffled_x1_data[:test_data_size]
-            test_x2 = shuffled_x2_data[:test_data_size]
-            test_x2_image_counts = shuffled_x2_image_counts[:test_data_size]
+            test_x = [
+                shuffled_x_mode[:test_data_size]
+                for shuffled_x_mode in shuffled_x_data
+            ]
             test_y = shuffled_y_data[:test_data_size]
-            train_x1 = shuffled_x1_data[test_data_size : test_data_size + initial_train_data_size]
-            train_x2 = shuffled_x2_data[test_data_size : test_data_size + initial_train_data_size]
-            train_x2_image_counts = shuffled_x2_image_counts[test_data_size : test_data_size + initial_train_data_size]
+            train_x = [
+                shuffled_x_mode[test_data_size : test_data_size + initial_train_data_size]
+                for shuffled_x_mode in shuffled_x_data
+            ]
             train_y = shuffled_y_data[test_data_size : test_data_size + initial_train_data_size]
-            unlabeled_x1 = shuffled_x1_data[test_data_size + initial_train_data_size :]
-            unlabeled_x2 = shuffled_x2_data[test_data_size + initial_train_data_size :]
-            unlabeled_x2_image_counts = shuffled_x2_image_counts[test_data_size + initial_train_data_size :]
+            unlabeled_x = [
+                shuffled_x_mode[test_data_size + initial_train_data_size :]
+                for shuffled_x_mode in shuffled_x_data
+            ]
             unlabeled_y = shuffled_y_data[test_data_size + initial_train_data_size :]
+
+            # Ensure we won't attempt to label more data than we have available
+            if self.ACTIVE_LEARNING_BATCH_SIZE * self.ACTIVE_LEARNING_LOOP_COUNT > len(unlabeled_y):
+                raise ValueError(f"Too few unlabeled datapoints ({len(unlabeled_y)}), compared to minimum ({self.ACTIVE_LEARNING_BATCH_SIZE * self.ACTIVE_LEARNING_LOOP_COUNT}).")
 
             # Begin Active Learning Loops
             al_loop_range = trange(self.ACTIVE_LEARNING_LOOP_COUNT)
@@ -118,36 +131,39 @@ class Tester:
             for al_loop in al_loop_range:
                 # Train Model on current training data
                 pre_train_time = time.time()
-                al_loop_range.set_description(f"Test {test}: Data size {train_x1.shape[0]}: ")
+                al_loop_range.set_description(f"Test {test}: Data size {train_x[0].shape[0]}: ")
 
                 # Trigger training epoch
-                model.train(train_x1,train_x2,train_x2_image_counts, train_y)
+                for epoch in range(self.TRAINING_EPOCHS):
+                    # TODO: Shuffle data at each training epoch
+                    model.train(train_x, train_y)
                 training_time = time.time() - pre_train_time
 
                 # Query model for samples to label
                 pre_query_time = time.time()
-                label_indices = model.query(unlabeled_x1,unlabeled_x2,unlabeled_x2_image_counts, self.ACTIVE_LEARNING_BATCH_SIZE)
+                label_indices = model.query(unlabeled_x, self.ACTIVE_LEARNING_BATCH_SIZE)
                 querying_time = time.time() - pre_query_time
 
                 # Evaluate model on train and test data
-                train_performance = self.METRIC_FUNCTION(train_y, model.predict(train_x1,train_x2,train_x2_image_counts))
-                test_performance = self.METRIC_FUNCTION(test_y, model.predict(test_x1,test_x2,test_x2_image_counts))
+                train_performance = self.METRIC_FUNCTION(train_y, model.predict(train_x))
+                test_performance = self.METRIC_FUNCTION(test_y, model.predict(test_x))
+
+                # Display current performance in progressbar
+                al_loop_range.set_postfix(data_size=len(train_x[0]), train_acc=train_performance, test_acc=test_performance)
 
                 # Save model results for this active learning loop
-                results.training_performance.append(train_performance)
-                results.test_performance.append(test_performance)
-                results.data_size.append(train_x1.shape[0])
-                results.training_time.append(training_time)
-                results.querying_time.append(querying_time)
+                results.add(test, al_loop, len(train_x[0]), train_performance, test_performance, training_time, querying_time)
 
                 # Add chosen samples to train data for next AL loop
-                train_x1 = np.concatenate([train_x1, unlabeled_x1[label_indices]], axis=0)
-                train_x2 = np.concatenate([train_x2, unlabeled_x2[label_indices]], axis=0)
-                train_x2_image_counts = np.concatenate([train_x2_image_counts, unlabeled_x2_image_counts[label_indices]], axis=0)
+                train_x = [
+                    np.concatenate([train_x[mode_ind], unlabeled_x[mode_ind][label_indices]], axis=0)
+                    for mode_ind in range(len(train_x))
+                ]
                 train_y = np.concatenate([train_y, unlabeled_y[label_indices]], axis=0)
-                unlabeled_x1 = np.delete(unlabeled_x1, label_indices, axis=0)
-                unlabeled_x2 = np.delete(unlabeled_x2, label_indices, axis=0)
-                unlabeled_x2_image_counts = np.delete(unlabeled_x2_image_counts, label_indices, axis=0)
+                unlabeled_x = [
+                    np.delete(unlabeled_x_mode, label_indices, axis=0)
+                    for unlabeled_x_mode in unlabeled_x
+                ]
                 unlabeled_y = np.delete(unlabeled_y, label_indices, axis=0)
 
         # Save results
@@ -159,33 +175,39 @@ class Tester:
     Plots and saves train/test curves for all models, along with their AUC measures
     '''
     def plot_results(self, plot_savename="test_results.png") -> None:
-        fig, axarr = plt.subplots(2, 2, figsize=(10,8))
+        fig, axarr = plt.subplots(2, 2, figsize=(10,8), constrained_layout=True)
 
         model_names = [r.model_name for r in self.model_results]
 
         # Plot training curve
         for r in self.model_results:
-            axarr[0][0].plot(r.data_size, r.training_performance, label=r.model_name)
+            x = np.mean(r.data_size, axis=0)
+            y = np.mean(r.training_performance, axis=0)
+            axarr[0][0].plot(x, y, label=r.model_name)
         axarr[0][0].legend()
         axarr[0][0].title.set_text("Training Performance")
 
         # Plot train AuC measure for each model
         train_auc = []
         for r in self.model_results:
-            train_auc.append(skm.auc(range(self.ACTIVE_LEARNING_LOOP_COUNT), r.training_performance))
+            y = np.mean(r.training_performance, axis=0)
+            train_auc.append(skm.auc(range(self.ACTIVE_LEARNING_LOOP_COUNT), y))
         axarr[0][1].bar(model_names, train_auc)
         axarr[0][1].title.set_text("Training AuC")
 
         # Plot testing curve
         for r in self.model_results:
-            axarr[1][0].plot(r.data_size, r.test_performance, label=r.model_name)
+            x = np.mean(r.data_size, axis=0)
+            y = np.mean(r.test_performance, axis=0)
+            axarr[1][0].plot(x, y, label=r.model_name)
         axarr[1][0].legend()
         axarr[1][0].title.set_text("Testing Performance")
 
         # Plot test AuC measure for each model
         test_auc = []
         for r in self.model_results:
-            test_auc.append(skm.auc(range(self.ACTIVE_LEARNING_LOOP_COUNT), r.test_performance))
+            y = np.mean(r.test_performance, axis=0)
+            test_auc.append(skm.auc(range(self.ACTIVE_LEARNING_LOOP_COUNT), y))
         axarr[1][1].bar(model_names, test_auc)
         axarr[1][1].title.set_text("Testing AuC")
 
@@ -201,20 +223,27 @@ class Tester:
 Simple struct for Tester to store evaluation info associated with a particular model
 '''
 class ModelResults:
-    def __init__(self, model:ModelInterface):
+    def __init__(self, model:ModelInterface, test_count: int, active_learning_loop_count: int):
         # Store name and details to identify model and results if model is lost
         self.model_name = model.name()
         self.model_details = model.details()
 
-        # Store performance on training and test data after each active learning loop
-        self.training_performance = []
-        self.test_performance = []
-        
         # Store data size after each active learning loop
-        self.data_size = []
+        self.data_size = np.zeros((test_count, active_learning_loop_count))
+
+        # Store performance on training and test data after each active learning loop
+        self.training_performance = np.zeros((test_count, active_learning_loop_count))
+        self.test_performance = np.zeros((test_count, active_learning_loop_count))
 
         # Store training time during each active learning loop
-        self.training_time = []
+        self.training_time = np.zeros((test_count, active_learning_loop_count))
 
         # Store querying time during each active learning loop
-        self.querying_time = []
+        self.querying_time = np.zeros((test_count, active_learning_loop_count))
+
+    def add(self, test_iteration, active_learning_iteration, data_size, training_performance, test_performance, training_time, querying_time):
+        self.data_size[test_iteration, active_learning_iteration] = data_size
+        self.training_performance[test_iteration, active_learning_iteration] = training_performance
+        self.test_performance[test_iteration, active_learning_iteration] = test_performance
+        self.training_time[test_iteration, active_learning_iteration] = training_time
+        self.querying_time[test_iteration, active_learning_iteration] = querying_time

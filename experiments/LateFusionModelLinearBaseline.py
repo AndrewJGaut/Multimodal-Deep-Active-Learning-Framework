@@ -82,7 +82,7 @@ tester_y = first_modality[1]
 multimodal_model = LateFusionModelWithMeanProbabilityUncertaintySampling([ProbabilisticSVM(), ProbabilisticSVM()], MEAN_CLASSIFICATION)
 
 if __name__ == "__main__":
-    tester = Tester(tester_x, tester_y, training_epochs=1, active_learning_loop_count=2)
+    tester = Tester([tester_x], tester_y, training_epochs=1, active_learning_loop_count=2)
     tester.test_model(multimodal_model)
     tester.plot_results()
 """

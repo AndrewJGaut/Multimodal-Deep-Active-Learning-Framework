@@ -1,5 +1,6 @@
 import torch
 from sklearn.cluster import KMeans
+import numpy as np
 
 
 class SampleMethod:
@@ -32,14 +33,16 @@ class KMeansPlusPlusSeeding(SampleMethod):
         # keep in mind that X is of shape (n_examples, n_dimension_in_grad_embedding)
         # so the cluster points are the ROWS of X.
         centers = X[torch.randint(low=0, high=X.shape[0], size=(1,))].reshape(1, 1, -1)
+        center_indices = list()
 
         while centers.shape[0] < n_samples:
             squared_distances = torch.min(torch.norm(X - centers, dim=2), dim=0).values ** 2
             new_center_index = torch.multinomial(squared_distances, 1)
             centers = torch.cat((centers, X[new_center_index].reshape(1, 1, -1)))
+            center_indices.append(new_center_index)
 
         # the samples are the computed centers.
-        return centers
+        return np.array(center_indices) #centers
 
 class WeightedKMeansSampling(SampleMethod):
     """
@@ -68,7 +71,7 @@ class WeightedKMeansSampling(SampleMethod):
         kmeans_model.fit(X, sample_weight=weights)
         cluster_centers = torch.from_numpy(kmeans_model.cluster_centers_)[:, None, :]
         sample_indices = torch.min(torch.norm(X-cluster_centers, dim=2), dim=1).indices
-        return X[sample_indices]
+        return np.array(sample_indices) #X[sample_indices]
 
 
 
