@@ -2,7 +2,6 @@ from typing import List
 import numpy as np
 from tqdm.notebook import trange as trange
 import matplotlib.pyplot as plt
-%matplotlib inline
 
 import torch
 import torch.nn as nn

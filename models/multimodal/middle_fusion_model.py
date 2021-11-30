@@ -1,3 +1,6 @@
+from __future__ import print_function
+from __future__ import division
+
 import numpy as np
 from test_framework.model_interface import ModelInterface
 import torch
@@ -7,6 +10,29 @@ import time
 
 from active_learning.cluster_margin import *
 from active_learning.badge import *
+
+# Adapted from https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html
+# for kaggle satellite image classification dataset https://www.kaggle.com/mahmoudreda55/satellite-image-classification
+# and then basic active learning was applied.
+
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+import torchvision
+from torchvision import datasets, models, transforms
+from torch.utils.data import TensorDataset, DataLoader
+import matplotlib.pyplot as plt
+from utils.pytorch_finetuning_utils import train_model, train_model_given_numpy_arrays, initialize_model
+print("PyTorch Version: ",torch.__version__)
+print("Torchvision Version: ",torchvision.__version__)
+import sys
+sys.path.append("..")
+from test_framework.model_interface import ModelInterface
+from test_framework.tester import Tester
+from utils.data_utils import get_kaggle_satellite_image_classification_dataset_as_numpy_arrays
+import active_learning.categorical_query_functions import *
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -229,8 +255,119 @@ class MiddleFusionModel(ModelInterface):
         return softmax_outputs
 
     def query(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray, labeling_batch_size: int) -> np.ndarray:
-        if self.badge is not None:
-            return self.badge.query(unlabeled_data)
         softmax_outputs = self.predict_proba(x1, x2, x2_image_counts)
         indices = self.active_learning_function(softmax_outputs, labeling_batch_size)
         return indices
+
+
+class ActiveLearningModel(ModelInterface):
+    def __init__(self, query_function_name, feature_extract=True,
+                 num_epochs=8, batch_size=32, train_verbose=True):
+
+        model_ft, input_size = initialize_model("squeezenet", 4, feature_extract, use_pretrained=True)
+        self.model = model_ft
+        self.model.to(device)
+
+        # Gather the parameters to be optimized/updated in this run. If we are
+        #  finetuning we will be updating all parameters. However, if we are
+        #  doing feature extract method, we will only update the parameters
+        #  that we have just initialized, i.e. the parameters with requires_grad
+        #  is True.
+        params_to_update = self.model.parameters()
+        verbose = False
+        if verbose:
+            print("Params to learn:")
+        if feature_extract:
+            params_to_update = []
+            for name, param in self.model.named_parameters():
+                if param.requires_grad == True:
+                    params_to_update.append(param)
+                    if verbose:
+                        print("\t", name)
+        elif verbose:
+            for name, param in self.model.named_parameters():
+                if param.requires_grad == True:
+                    print("\t", name)
+
+        # Observe that all parameters are being optimized
+        optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
+        self._optimizer = optimizer_ft
+
+        # store criterion
+        self._criterion = nn.CrossEntropyLoss()
+
+        self.num_epochs = num_epochs
+        self.batch_size = batch_size
+        self.train_verbose = train_verbose
+
+        # For cluster-margin active learning algorithm, clusters must be
+        # saved between queries
+        if self.query_function_name == "CLUSTER_MARGIN":
+            raise NotImplementedError("Cluster margin not yet implemented for middle fusion model")
+            """
+            self.cluster_margin = ClusterMarginQueryFunction(
+                self.model, [self.model.post_fusion_layer.weight],
+                margin_batch_size=2 * self.active_learning_batch_size,
+                target_batch_size=self.active_learning_batch_size
+            )
+            self.badge = None
+            """
+        elif self.query_function_name == "BADGE":
+            self.badge = BADGEQueryFunction(
+                self.model, None,
+                margin_batch_size=2 * self.batch_size,
+                target_batch_size=self.batch_size
+            )
+            self.cluster_margin = None
+        else:
+            self.cluster_margin = None
+            self.badge = None
+
+    def name(self) -> str:
+        return self.model.name
+
+    def details(self) -> str:
+        return self.model.details
+
+    def train(self, train_x: np.ndarray, train_y: np.ndarray) -> None:
+        self.model = train_model_given_numpy_arrays(self.model, train_x, train_y, self._criterion, self._optimizer,
+                                                    self.num_epochs, self.batch_size, verbose=self.train_verbose)
+
+    def predict(self, test_x: np.ndarray):
+        self.model.eval()
+        x_tensor = torch.tensor(test_x)
+        dataset = TensorDataset(x_tensor)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, num_workers=0, shuffle=False)
+        preds_list = []
+        for (inputs,) in dataloader:
+            inputs = inputs.to(device)
+            preds_list.append(self.model(inputs).cpu().detach().numpy())
+        return np.vstack(preds_list)
+
+    def query(self, unlabeled_data: np.ndarray, labeling_batch_size: int) -> np.ndarray:
+        #softmax = lambda x: np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
+        #softmax_outputs = softmax(self.predict(unlabeled_data))
+
+        if self.query_function_name == "RANDOM":
+            data_size = unlabeled_data[0].shape[0]
+            return np.random.choice(np.arange(data_size), size=labeling_batch_size, replace=False)
+
+        if self.query_function_name == "MIN_MAX":
+            return MIN_MAX(self.predict(unlabeled_data), labeling_batch_size)
+
+        if self.query_function_name == "MIN_MARGIN":
+            return MIN_MARGIN(self.predict(unlabeled_data), labeling_batch_size)
+
+        if self.query_function_name == "MAX_ENTROPY":
+            return MAX_ENTROPY(self.predict(unlabeled_data), labeling_batch_size)
+
+        if self.query_function_name == "CLUSTER_MARGIN":
+            return self.cluster_margin.query(unlabeled_data)
+
+        if self.query_function_name == "BADGE":
+            return self.badge.query(unlabeled_data)
+
+        raise ValueError(f"Unrecognized query function name: {self.query_function_name}")
+
+        #indices = QUERY_FUNCTION(softmax_outputs, labeling_batch_size)
+        #return indices
