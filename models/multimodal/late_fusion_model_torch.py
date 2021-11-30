@@ -123,9 +123,10 @@ class MultiModalLateFusionModel(nn.Module):
 
 # This interface uses the multimodal model above with a specified query function
 class MultiModalLateFusionModelInterface(ModelInterface):
-    def __init__(self, query_function_name: str, active_learning_batch_size: int = 32):
+    def __init__(self, query_function_name: str, active_learning_batch_size: int = 32, extra_query_option=None):
         self.query_function_name = query_function_name
         self.active_learning_batch_size = active_learning_batch_size
+        self.extra_query_option = extra_query_option
 
         # Model Training Constants
         self.TRAINING_MINIBATCH_SIZE = 128
@@ -147,14 +148,16 @@ class MultiModalLateFusionModelInterface(ModelInterface):
             self.cluster_margin = ClusterMarginQueryFunction(
                 self.model, [self.model.post_fusion_layer.weight],
                 margin_batch_size=2 * self.active_learning_batch_size,
-                target_batch_size=self.active_learning_batch_size
+                target_batch_size=self.active_learning_batch_size,
+                cluster_method=self.extra_query_option
             )
             self.badge = None
         elif self.query_function_name == "BADGE":
             self.badge = BADGEQueryFunction(
                 self.model, [self.model.post_fusion_layer.weight],
                 margin_batch_size=2 * self.active_learning_batch_size,
-                target_batch_size=self.active_learning_batch_size
+                target_batch_size=self.active_learning_batch_size,
+                sample_method=self.extra_query_option
             )
             self.cluster_margin = None
         else:

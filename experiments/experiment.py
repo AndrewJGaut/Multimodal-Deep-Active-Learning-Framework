@@ -38,16 +38,18 @@ TEST_DATA_FRACTION = 0.05
 class Experiment:
 
     def __init__(self, models, query_function_names,
-                 test_data_fraction=0.05, final_model_layer_len=64,
+                 query_function_name_to_extra_options=dict(),
+                 initial_train_data_fraction=0.05, final_model_layer_len=64,
                  active_learning_batch_size=256, training_epochs=4, test_repeat_count=2):
         self.models = models
         self.query_function_names = query_function_names
+        self.query_function_name_to_extra_options = query_function_name_to_extra_options
         self.path_to_data = "./data/kaggle_satellite_image_classification"
         self.num_classes = 4
         self.main_image_dims = (64, 64)
         self.secondary_img_dims = (32, 32)
         self.max_secondary_images = 5
-        self.test_data_fraction = test_data_fraction
+        self.test_data_fraction = initial_train_data_fraction
         self.final_model_layer_len = final_model_layer_len
 
         self.active_learning_batch_size = active_learning_batch_size
@@ -95,9 +97,13 @@ class Experiment:
         return main_image_all.numpy(), secondary_images_all.numpy(), y_all.numpy()
 
 
-    def get_plot_name(self, model_name, query_function_name):
-        return os.path.join("outputs",
-                            f"{model_name}_{query_function_name}.png")
+    def get_plot_name(self, model_name, query_function_name, extra_option=None):
+        if extra_option is None:
+            return os.path.join("outputs",
+                                f"{model_name}_{query_function_name}.png")
+        else:
+            return os.path.join("outputs",
+                                f"{model_name}_{query_function_name}_{extra_option.method_name}.png")
 
     def plot(self, outfile_path): #model_name, active_learning_method):
         #outfile_path = self.get_plot_name(model_name, active_learning_method)
@@ -112,7 +118,7 @@ class Experiment:
 
         # configure the tester
         self.tester = Tester([x_main, x_secondary], y)
-        self.tester.INITIAL_TRAIN_DATA_FRACTION = self.test_data_fraction
+        self.tester.INITIAL_TRAIN_DATA_FRACTION = self.initial_train_data_fraction
         self.tester.ACTIVE_LEARNING_BATCH_SIZE = self.active_learning_batch_size
         self.tester.TRAINING_EPOCHS = self.training_epochs
         self.tester.TEST_REPEAT_COUNT = self.test_repeat_count
@@ -120,13 +126,25 @@ class Experiment:
         for model in self.models:
             for query_function_name in self.query_function_names:
                 try:
-                    curr_model = model(query_function_name)
-                    curr_model_outfile_name = self.get_plot_name(curr_model.name(), query_function_name)
-
-                    curr_model._name = query_function_name # this is so that tester will plot it with the correct name
                     print("working on {}".format(curr_model.name()))
-                    self.tester.test_model(curr_model)
-                    self.plot(curr_model_outfile_name)
+                    if query_function_name in self.query_function_name_to_extra_options:
+                        for extra_option in self.query_function_name_to_extra_options:
+                            curr_model = model(query_function_name, extra_query_option=extra_option)
+                            curr_model_outfile_name = self.get_plot_name(curr_model.name(), query_function_name,
+                                                                         extra_option=extra_option)
+
+                            curr_model._name = query_function_name + "_" + extra_option.method_name  # this is so that tester will plot it with the correct name
+
+                            self.tester.test_model(curr_model)
+                            self.plot(curr_model_outfile_name)
+                    else:
+                        curr_model = model(query_function_name)
+                        curr_model_outfile_name = self.get_plot_name(curr_model.name(), query_function_name)
+
+                        curr_model._name = query_function_name  # this is so that tester will plot it with the correct name
+
+                        self.tester.test_model(curr_model)
+                        self.plot(curr_model_outfile_name)
                 except Exception as e:
                     print(f"Got exception {e} for model {curr_model.name()} with stack trace:\n{traceback.print_exc()}")
 
