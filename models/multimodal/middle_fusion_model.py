@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 import time
+from typing import List
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -182,13 +183,15 @@ class MiddleFusionModel(ModelInterface):
     def details(self) -> str:
         return self.model.details()
 
-    def train(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray, y: np.ndarray) -> None:
+    def train(self, x:List[np.ndarray], y: np.ndarray) -> None:
+        x1, x2, x2_image_counts = x
         torch.manual_seed(0) # comment this line out to increase variation across experiments
         self.model = train_model_given_numpy_arrays(self.model, x1, x2, x2_image_counts, y,
                                                     self._criterion, self._optimizer,
                                                     self.num_epochs, self.batch_size, verbose=self.train_verbose)
 
-    def predict(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray):
+    def predict(self, x:List[np.ndarray]):
+        x1, x2, x2_image_counts = x
         self.model.eval()
         x1 = torch.tensor(x1)
         x2 = torch.tensor(x2)
@@ -203,13 +206,13 @@ class MiddleFusionModel(ModelInterface):
             preds_list.append(self.model(x1,x2,x2_image_counts).cpu().detach().numpy())
         return np.vstack(preds_list)
 
-    def predict_proba(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray) -> np.ndarray:
+    def predict_proba(self, x:List[np.ndarray]) -> np.ndarray:
         self.model.eval()
-        softmax = lambda x: np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
-        softmax_outputs = softmax(self.predict(x1, x2, x2_image_counts))
+        softmax = lambda s: np.exp(s) / np.sum(np.exp(s), axis=-1, keepdims=True)
+        softmax_outputs = softmax(self.predict(x))
         return softmax_outputs
 
-    def query(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray, labeling_batch_size: int) -> np.ndarray:
-        softmax_outputs = self.predict_proba(x1, x2, x2_image_counts)
+    def query(self, unlabeled_x:List[np.ndarray], labeling_batch_size: int) -> np.ndarray:
+        softmax_outputs = self.predict_proba(unlabeled_x)
         indices = self.active_learning_function(softmax_outputs, labeling_batch_size)
         return indices
