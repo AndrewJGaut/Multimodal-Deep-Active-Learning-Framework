@@ -4,10 +4,12 @@ from models.multimodal.middle_fusion_model import MiddleFusionModel
 # from models.unimodal.squeezenet import SqueezeNet
 # from models.multimodal.combination_functions import MEAN_CLASSIFICATION
 from test_framework.tester import Tester
+from test_framework.metrics import LABEL_BALANCED_ACCURACY
 import numpy as np
 from utils.data_utils import get_kaggle_satellite_image_classification_dataset_as_numpy_arrays
 from active_learning import categorical_query_functions as query_functions
 import collections
+import torch
 
 PATH_TO_DATA = "../data/kaggle_satellite_image_classification"
 active_learning_functions = [query_functions.RANDOM, query_functions.MIN_MAX, query_functions.MAX_ENTROPY, query_functions.MIN_MARGIN]
@@ -41,13 +43,18 @@ if __name__ == "__main__":
     # print(collections.Counter(first_modality[1]))
 
     # define tester
-    tester = Tester(tester_x1, tester_x2, x2_image_counts, tester_y_onehot, training_epochs=10, active_learning_loop_count=10)
-    tester.INITIAL_TRAIN_DATA_FRACTION = 0.05
+    tester = Tester(tester_x1, tester_x2, x2_image_counts, tester_y_onehot, training_epochs=5, active_learning_loop_count=20)
+    tester.INITIAL_TRAIN_DATA_FRACTION = 0.01
+    tester.ACTIVE_LEARNING_BATCH_SIZE = 1
+    tester.METRIC_FUNCTION = LABEL_BALANCED_ACCURACY
 
     for i,active_learning_function in enumerate(active_learning_functions):
         print(f"Active learning function: {active_learning_function_descriptions[i]}")
+        
         # define model
-        multimodal_model = MiddleFusionModel(active_learning_function=active_learning_function)
+        multimodal_model = MiddleFusionModel(active_learning_function=active_learning_function,
+                                            name=active_learning_function_descriptions[i],
+                                            random_seed=0)
 
         # test model
         tester.test_model(multimodal_model)

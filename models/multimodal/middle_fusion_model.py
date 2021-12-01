@@ -1,4 +1,5 @@
 import numpy as np
+from torch import random
 from test_framework.model_interface import ModelInterface
 import torch
 import torch.nn as nn
@@ -78,35 +79,48 @@ Defines a wrapper for a middle fusion model based on AlexNet
 # https://pytorch.org/vision/master/_modules/torchvision/models/alexnet.html
 
 class MiddleFusionNet(torch.nn.Module):
-    def __init__(self, num_classes: int = 4, dropout: float = 0.5) -> None:
+    def __init__(self, num_classes: int = 4, dropout: float = 0.5, random_seed=None) -> None:
+        if random_seed is not None:
+            torch.manual_seed(random_seed)
         super(MiddleFusionNet, self).__init__()
         self.num_classes = num_classes
 
-        self.features = nn.Sequential(
+        self.conv1 = nn.Sequential(
             nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=3, stride=2),
         )
-        self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
-        self.classifier = nn.Sequential(
+        self.avgpool1 = nn.AdaptiveAvgPool2d((6, 6))
+        self.linear1 = nn.Sequential(
+            nn.Dropout(p=dropout),
+            nn.Linear(2304, 1024),
+            nn.ReLU(inplace=True),
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+        )
+        self.avgpool2 = nn.AdaptiveAvgPool2d((6, 6))
+        self.linear2 = nn.Sequential(
             nn.Dropout(p=dropout),
             nn.Linear(2304, 1024),
             nn.ReLU(inplace=True),
         )
         self.final_linear = nn.Linear(1024*2, num_classes)
     def forward(self, x1: torch.Tensor, x2: torch.Tensor, x2_image_counts: torch.Tensor) -> torch.Tensor:
-        x1_features = self.features(x1)
-        x1_features = self.avgpool(x1_features)
+        x1_features = self.conv1(x1)
+        x1_features = self.avgpool1(x1_features)
         x1_features = torch.flatten(x1_features, 1)
-        x1_embeddings = self.classifier(x1_features)
+        x1_embeddings = self.linear1(x1_features)
 
         x2_embeddings = []
         for count, x2_image_stack in zip(x2_image_counts,x2):
             if count > 0:
-                cur_x2_features = self.features(x2_image_stack[0:count])
-                cur_x2_features = self.avgpool(cur_x2_features)
+                cur_x2_features = self.conv2(x2_image_stack[0:count])
+                cur_x2_features = self.avgpool2(cur_x2_features)
                 cur_x2_features = torch.flatten(cur_x2_features, 1)
-                cur_x2_embeddings = self.classifier(cur_x2_features)
+                cur_x2_embeddings = self.linear2(cur_x2_features)
                 x2_embeddings.append(torch.mean(cur_x2_embeddings,axis=0))
             else:
                 x2_embeddings.append(torch.zeros(1024).to(device))
@@ -123,11 +137,11 @@ class MiddleFusionModel(ModelInterface):
     Instantiate the middle fusion model.
     '''
     def __init__(self, active_learning_function,
-                 name=None, details=None,
+                 name=None, details=None, random_seed=None,
                 num_epochs=3, batch_size=8, train_verbose=True,
                 query_function=None):
         self.active_learning_function = active_learning_function
-        self.model = MiddleFusionNet(num_classes=4)
+        self.model = MiddleFusionNet(num_classes=4,random_seed=random_seed)
         self._name = name
         self._details = details
 
@@ -169,14 +183,13 @@ class MiddleFusionModel(ModelInterface):
         return self.model.details()
 
     def train(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray, y: np.ndarray) -> None:
-        # x1,x2 = np.swapaxes(train_x,0,1)
+        torch.manual_seed(0) # comment this line out to increase variation across experiments
         self.model = train_model_given_numpy_arrays(self.model, x1, x2, x2_image_counts, y,
                                                     self._criterion, self._optimizer,
                                                     self.num_epochs, self.batch_size, verbose=self.train_verbose)
 
     def predict(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray):
         self.model.eval()
-        # x1,x2 = np.swapaxes(test_x,0,1)
         x1 = torch.tensor(x1)
         x2 = torch.tensor(x2)
         x2_image_counts = torch.tensor(x2_image_counts)

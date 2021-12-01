@@ -31,6 +31,25 @@ def ACCURACY(y_actual:np.ndarray, y_predicted:np.ndarray) -> float:
     return np.mean(y_actual[y_predicted == y_prediction_probs])
 
 '''
+Label-balanced categorical prediction accuracy.
+Assumes y_actual entries are 1-hot arrays, and y_predicted entries are
+normalized probability arrays of the same length.
+'''
+def LABEL_BALANCED_ACCURACY(y_actual:np.ndarray, y_predicted:np.ndarray) -> float:
+    y_prediction_probs = np.max(y_predicted, axis=-1, keepdims=True)
+    correct_predictions = y_actual * (y_predicted == y_prediction_probs)
+    label_accuracies = np.sum(correct_predictions, axis=0) / np.sum(y_actual, axis=0)
+    return np.mean(label_accuracies)
+
+'''
+Categorical prediction confidence for the true label.
+Assumes y_actual entries are 1-hot arrays, and y_predicted entries are
+normalized probability arrays of the same length.
+'''
+def LIKELIHOOD(y_actual:np.ndarray, y_predicted:np.ndarray) -> float:
+    return np.mean(np.sum(y_actual * y_predicted, axis=1), axis=0)
+
+'''
 Categorical log likelihood (negative binary cross-entropy).
 Assumes y_actual entries are 1-hot arrays, and y_predicted entries are
 normalized probability arrays of the same length.
