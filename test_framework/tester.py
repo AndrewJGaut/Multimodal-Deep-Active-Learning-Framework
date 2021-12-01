@@ -28,7 +28,7 @@ class Tester:
 
         # Function to call to measure performance (may change for different data formats)
         # Must be consistent for all models compared.
-        self.METRIC_FUNCTION = metrics.ACCURACY
+        self.METRIC_FUNCTION = metrics.LABEL_BALANCED_ACCURACY
 
         # Fraction of input data to set aside for testing
         self.TEST_DATA_FRACTION = 0.1
@@ -135,8 +135,13 @@ class Tester:
 
                 # Trigger training epoch
                 for epoch in range(self.TRAINING_EPOCHS):
-                    # TODO: Shuffle data at each training epoch
-                    model.train(train_x, train_y)
+                    shuffle_order = np.random.permutation(len(train_y))
+                    shuffled_y = train_y[shuffle_order]
+                    shuffled_x = [
+                        x_mode[shuffle_order]
+                        for x_mode in train_x
+                    ]
+                    model.train(shuffled_x, shuffled_y)
                 training_time = time.time() - pre_train_time
 
                 # Query model for samples to label
@@ -174,7 +179,7 @@ class Tester:
     '''
     Plots and saves train/test curves for all models, along with their AUC measures
     '''
-    def plot_results(self, plot_savename="test_results.png") -> None:
+    def plot_results(self, plot_savename="test_results.png", show=False) -> None:
         fig, axarr = plt.subplots(2, 2, figsize=(10,8), constrained_layout=True)
 
         model_names = [r.model_name for r in self.model_results]
@@ -212,8 +217,9 @@ class Tester:
         axarr[1][1].title.set_text("Testing AuC")
 
         # Save plots
-        plt.savefig(plot_savename)
-        #plt.show()
+        plt.savefig(plot_savename, facecolor='white', transparent=False)
+        if show:
+            plt.show()
 
 
 
