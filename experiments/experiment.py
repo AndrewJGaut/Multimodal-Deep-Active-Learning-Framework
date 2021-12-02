@@ -24,23 +24,36 @@ from active_learning.cluster_margin import *
 import traceback
 
 
+def get_experiment_configs(initial_train_data_fractions, active_learning_batch_sizes, training_epochs, test_repeat_counts):
+    experiment_configs = list()
+    for i in range(initial_train_data_fractions):
+        experiment_configs.append(ExperimentConfig(initial_train_data_fraction = initial_train_data_fractions[i],
+                                                   active_learning_batch_size=active_learning_batch_sizes[i],
+                                                   training_epochs=training_epochs[i],
+                                                   test_repeat_count=test_repeat_counts[i]))
 
-MAIN_IMG_DIMS = (64,64)
-SECONDARY_IMG_DIMS = (32, 32)
-MAX_SECONDARY_IMAGES = 5
+    return experiment_configs
 
-# Model Constants
-FINAL_LAYER_LEN = 64
 
-# Training Constants
-TEST_DATA_FRACTION = 0.05
+class ExperimentConfig:
+    def __init__(self, initial_train_data_fraction=0.05, final_model_layer_len=64,
+                 active_learning_batch_size=256, training_epochs=4, test_repeat_count=2):
+        self.test_data_fraction = initial_train_data_fraction
+        self.final_model_layer_len = final_model_layer_len
+
+        self.active_learning_batch_size = active_learning_batch_size
+        self.training_epochs = training_epochs
+        self.test_repeat_count = test_repeat_count
+
+    def __str__(self):
+        return ",".join([self.test_data_fraction, self.final_model_layer_len, self.active_learning_batch_size,
+                         self.training_epochs, self.test_repeat_count])
 
 class Experiment:
 
     def __init__(self, models, query_function_names,
                  query_function_name_to_extra_options=dict(),
-                 initial_train_data_fraction=0.05, final_model_layer_len=64,
-                 active_learning_batch_size=256, training_epochs=4, test_repeat_count=2):
+                 experiment_configs = list()):
         self.models = models
         self.query_function_names = query_function_names
         self.query_function_name_to_extra_options = query_function_name_to_extra_options
@@ -49,12 +62,9 @@ class Experiment:
         self.main_image_dims = (64, 64)
         self.secondary_img_dims = (32, 32)
         self.max_secondary_images = 5
-        self.test_data_fraction = initial_train_data_fraction
-        self.final_model_layer_len = final_model_layer_len
 
-        self.active_learning_batch_size = active_learning_batch_size
-        self.training_epochs = training_epochs
-        self.test_repeat_count = test_repeat_count
+        self.experiment_configs = experiment_configs
+
 
         self.tester = None
 
@@ -67,18 +77,18 @@ class Experiment:
         """
         def transform_to_multimodal(image):
             main_image = transforms.Compose([
-                transforms.CenterCrop(MAIN_IMG_DIMS),
+                transforms.CenterCrop(self.main_image_dims),
                 transforms.ToTensor(),
                 # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
             ])(image.copy())
 
             secondary_images = [
                 transforms.Compose([
-                    transforms.RandomCrop(SECONDARY_IMG_DIMS),
+                    transforms.RandomCrop(self.secondary_img_dims),
                     transforms.ToTensor(),
                     # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                     transforms.Lambda(lambda img: transforms.functional.adjust_contrast(img, contrast_factor=0.8))
-                ])(image.copy()) for i in range(MAX_SECONDARY_IMAGES)
+                ])(image.copy()) for i in range(self.max_secondary_images)
                 ]
             secondary_images = torch.stack(secondary_images)
 
@@ -97,13 +107,12 @@ class Experiment:
         return main_image_all.numpy(), secondary_images_all.numpy(), y_all.numpy()
 
 
-    def get_plot_name(self, model_name, query_function_name, extra_option=None):
-        if extra_option is None:
-            return os.path.join("outputs",
-                                f"{model_name}_{query_function_name}.png")
-        else:
-            return os.path.join("outputs",
-                                f"{model_name}_{query_function_name}_{extra_option.method_name}.png")
+    def get_plot_name(self, model_name, query_function_name, experiment_config, extra_option=None):
+        output_file_extension = ".png"
+        output_file_name = f"{model_name}_{query_function_name}_{str(experiment_config)}"
+        if extra_option is not None:
+            output_file_name += f"_{extra_option.method_name}"
+        return os.path.join("outputs", output_file_name + output_file_extension)
 
     def plot(self, outfile_path): #model_name, active_learning_method):
         #outfile_path = self.get_plot_name(model_name, active_learning_method)
@@ -116,39 +125,42 @@ class Experiment:
         # load data
         x_main, x_secondary, y = self.load_dataset()
 
-        # configure the tester
-        self.tester = Tester([x_main, x_secondary], y)
-        self.tester.INITIAL_TRAIN_DATA_FRACTION = self.initial_train_data_fraction
-        self.tester.ACTIVE_LEARNING_BATCH_SIZE = self.active_learning_batch_size
-        self.tester.TRAINING_EPOCHS = self.training_epochs
-        self.tester.TEST_REPEAT_COUNT = self.test_repeat_count
+        for experiment_config in self.experiment_configs:
 
-        for model in self.models:
-            for query_function_name in self.query_function_names:
-                try:
-                    print("working on {}".format(curr_model.name()))
-                    if query_function_name in self.query_function_name_to_extra_options:
-                        for extra_option in self.query_function_name_to_extra_options:
-                            curr_model = model(query_function_name, extra_query_option=extra_option)
-                            curr_model_outfile_name = self.get_plot_name(curr_model.name(), query_function_name,
-                                                                         extra_option=extra_option)
+            # configure the tester for the experiment config
+            self.tester = Tester([x_main, x_secondary], y)
+            self.tester.INITIAL_TRAIN_DATA_FRACTION = experiment_config.initial_train_data_fraction
+            self.tester.ACTIVE_LEARNING_BATCH_SIZE = experiment_config.active_learning_batch_size
+            self.tester.TRAINING_EPOCHS = experiment_config.training_epochs
+            self.tester.TEST_REPEAT_COUNT = experiment_config.test_repeat_count
 
-                            curr_model._name = query_function_name + "_" + extra_option.method_name  # this is so that tester will plot it with the correct name
+            for model in self.models:
+                for query_function_name in self.query_function_names:
+                    try:
+                        print("working on {}".format(curr_model.name()))
+                        if query_function_name in self.query_function_name_to_extra_options:
+                            for extra_option in self.query_function_name_to_extra_options:
+                                curr_model = model(query_function_name, extra_query_option=extra_option)
+                                curr_model_outfile_name = self.get_plot_name(curr_model.name(), query_function_name,
+                                                                             experiment_config,
+                                                                             extra_option=extra_option)
+
+                                curr_model._name = query_function_name + "_" + extra_option.method_name  # this is so that tester will plot it with the correct name
+
+                                self.tester.test_model(curr_model)
+                                self.plot(curr_model_outfile_name)
+                        else:
+                            curr_model = model(query_function_name)
+                            curr_model_outfile_name = self.get_plot_name(curr_model.name(), query_function_name, experiment_config)
+
+                            curr_model._name = query_function_name  # this is so that tester will plot it with the correct name
 
                             self.tester.test_model(curr_model)
                             self.plot(curr_model_outfile_name)
-                    else:
-                        curr_model = model(query_function_name)
-                        curr_model_outfile_name = self.get_plot_name(curr_model.name(), query_function_name)
+                    except Exception as e:
+                        print(f"Got exception {e} for model {curr_model.name()} with stack trace:\n{traceback.print_exc()}")
 
-                        curr_model._name = query_function_name  # this is so that tester will plot it with the correct name
-
-                        self.tester.test_model(curr_model)
-                        self.plot(curr_model_outfile_name)
-                except Exception as e:
-                    print(f"Got exception {e} for model {curr_model.name()} with stack trace:\n{traceback.print_exc()}")
-
-            plt.clf()
+                plt.clf()
 
 
     def gradient_embedding_experiment(self):
