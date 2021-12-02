@@ -8,6 +8,8 @@ import time
 from typing import List
 
 from active_learning.categorical_query_functions import *
+from active_learning.cluster_margin import *
+from active_learning.badge import *
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -140,16 +142,25 @@ class MiddleFusionModel(ModelInterface):
     '''
     Instantiate the middle fusion model.
     '''
-    def __init__(self, query_function_name, active_learning_batch_size = 32,
+    def __init__(self, query_function_name: str, active_learning_batch_size: int = 32, extra_query_option=None,
                  random_seed=None, train_verbose=True):
         self.query_function_name = query_function_name
-        self.model = MiddleFusionNet(num_classes=4,random_seed=random_seed)
-        self._name = self.model.name()
-        self._details = self.model.details()
+        self.active_learning_batch_size = active_learning_batch_size
+        self.extra_query_option = extra_query_option
 
-        # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.model.to(device)
+        self.random_seed = random_seed
         self.train_verbose = train_verbose
+
+        # Model Training Constants
+        self.TRAINING_MINIBATCH_SIZE = 8
+
+        self.reset()
+
+        self._name = "Multimodal middle fusion model based on AlexNet"
+
+    def reset(self):
+        self.model = MiddleFusionNet(num_classes=4, random_seed=self.random_seed)
+        self.opt = torch.optim.Adam(self.model.parameters(), lr=1e-3)
 
         params_to_update = self.model.parameters()
 
@@ -159,6 +170,28 @@ class MiddleFusionModel(ModelInterface):
 
         # store criterion
         self._criterion = nn.CrossEntropyLoss()
+
+        # For cluster-margin active learning algorithm, clusters must be
+        # saved between queries
+        if self.query_function_name == "CLUSTER_MARGIN":
+            self.cluster_margin = ClusterMarginQueryFunction(
+                self.model, [self.model.final_linear.weight],
+                margin_batch_size=2 * self.active_learning_batch_size,
+                target_batch_size=self.active_learning_batch_size,
+                cluster_method=self.extra_query_option
+            )
+            self.badge = None
+        elif self.query_function_name == "BADGE":
+            self.badge = BADGEQueryFunction(
+                self.model, [self.model.final_linear.weight],
+                target_batch_size=self.active_learning_batch_size,
+                sample_method=self.extra_query_option
+            )
+            self.cluster_margin = None
+        else:
+            self.cluster_margin = None
+            self.badge = None
+
 
 
     # IDENTIFIER METHODS
@@ -220,10 +253,8 @@ class MiddleFusionModel(ModelInterface):
         elif self.query_function_name == "MAX_ENTROPY":
             return MAX_ENTROPY(self.predict_proba(unlabeled_x), labeling_batch_size)
         elif self.query_function_name == "CLUSTER_MARGIN":
-            # return self.cluster_margin.query(unlabeled_data)
-            pass
+            return self.cluster_margin.query(unlabeled_x)
         elif self.query_function_name == "BADGE":
-            #return self.badge.query(unlabeled_data)
-            pass
+            return self.badge.query(unlabeled_x)
         else:
             raise ValueError(f"Unrecognized query function name: {self.query_function_name}")
