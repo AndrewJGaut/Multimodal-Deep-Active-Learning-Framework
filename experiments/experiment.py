@@ -104,8 +104,8 @@ class Experiment:
         y_all = torch.eye(self.num_classes)[y_all]
 
         """TEST CODE"""
-        return main_image_all.numpy()[:600], secondary_images_all.numpy()[:600], y_all.numpy()[:600]
-        #return main_image_all.numpy(), secondary_images_all.numpy(), y_all.numpy()
+        #return main_image_all.numpy()[:600], secondary_images_all.numpy()[:600], y_all.numpy()[:600]
+        return main_image_all.numpy(), secondary_images_all.numpy(), y_all.numpy()
         """END TEST CODE"""
 
 

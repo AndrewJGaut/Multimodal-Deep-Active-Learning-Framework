@@ -43,7 +43,7 @@ class ClusterMarginQueryFunction:
     '''
 
     def __init__(self, model: nn.Module, last_layer_model_params: nn.Parameter, margin_batch_size: int,
-                 target_batch_size: int, cluster_method: ClusterMethod = AgglomerativeCluster()) -> None:
+                 target_batch_size: int, cluster_method: ClusterMethod = SklearnAgglomerativeCluster()) -> None:
         self.model = model
         self.last_layer_model_params = last_layer_model_params
         self.margin_batch_size = margin_batch_size

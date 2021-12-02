@@ -1,8 +1,7 @@
 from experiments.experiment import Experiment, ExperimentConfig, get_experiment_configs
 from models.multimodal.late_fusion_model_torch import MultiModalLateFusionModelInterface
 from models.multimodal.middle_fusion_model import MiddleFusionModel
-from models.multimodal.middle_fusion_model import MiddleFusionModel
-from clustering.cluster import KMeans, KMeansPlusPlus, AgglomerativeCluster, GMM
+from clustering.cluster import SklearnKMeans, SklearnAgglomerativeCluster, SklearnGMM
 from clustering.sampling import KMeansPlusPlusSeeding, WeightedKMeansSampling
 
 if __name__ == '__main__':
@@ -10,10 +9,9 @@ if __name__ == '__main__':
     We'll run all the experiments in this function
     """
     models = [MiddleFusionModel, MultiModalLateFusionModelInterface]
-    #query_function_names = ["RANDOM", "MIN_MAX", "MIN_MARGIN", "MAX_ENTROPY", "CLUSTER_MARGIN", "BADGE"]
-    query_function_names = ["CLUSTER_MARGIN", "BADGE"]
+    query_function_names = ["RANDOM", "MIN_MAX", "MIN_MARGIN", "MAX_ENTROPY", "CLUSTER_MARGIN", "BADGE"]
     options = {
-        "CLUSTER_MARGIN": [KMeans(), KMeansPlusPlus(), AgglomerativeCluster(), GMM()],
+        "CLUSTER_MARGIN": [SklearnKMeans(), SklearnAgglomerativeCluster(), SklearnGMM()],
         "BADGE": [KMeansPlusPlusSeeding(), WeightedKMeansSampling()]
     }
     initial_train_data_fractions = [0.001, 0.001, 0.005, 0.01, 0.05]
@@ -23,9 +21,6 @@ if __name__ == '__main__':
     experiment_configs = get_experiment_configs(initial_train_data_fractions, active_learning_batch_sizes,
                                                 training_epochs, test_repeat_counts)
 
-    """FOR TEST"""
-    experiment_configs = [ExperimentConfig(0.05, 64, 32, 4, 2)] # limit to one config
-    """END TEST CODE"""
     exp = Experiment(models=models, query_function_names=query_function_names,
                      query_function_name_to_extra_options=options, experiment_configs=experiment_configs)
     exp.run_experiments()

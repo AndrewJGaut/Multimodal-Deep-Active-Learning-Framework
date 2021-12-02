@@ -27,7 +27,7 @@ class ClusterMethod:
         return self.method_name
 
 
-class AgglomerativeCluster(ClusterMethod):
+class SklearnAgglomerativeCluster(ClusterMethod):
     def __init__(self, n_clusters=10, linkage='average'):
         super().__init__("AgglomerativeClustering", n_clusters)
         self.linkage = linkage
@@ -48,7 +48,7 @@ class AgglomerativeCluster(ClusterMethod):
         return labels
 
 
-class GMM(ClusterMethod):
+class SklearnGMM(ClusterMethod):
     def __init__(self, n_clusters=10):
         super().__init__("GMM", n_clusters)
 
@@ -68,27 +68,7 @@ class GMM(ClusterMethod):
         return labels
 
 
-class KMeansPlusPlus(ClusterMethod):
-    def __init__(self, n_clusters=10):
-        super().__init__("KMeans++", n_clusters)
-
-    def cluster(self, X, n_clusters=None):
-        # first conver the torch tensor into np array
-        #np_X = self.convert_to_numpy(X)
-
-        if n_clusters is None:
-            n_clusters = self.n_clusters
-
-        # now, call fit
-        kmeans = KMeans(n_clusters=self.n_clusters,
-                        init='k-means++')  # NOTE: init=random here implies that we AREN'T using kmeans++
-        labels = kmeans.fit_predict(X)
-
-        # might want to convert this into a torch tensor?
-        return labels
-
-
-class KMeans(ClusterMethod):
+class SklearnKMeans(ClusterMethod):
     def __init__(self, n_clusters=10):
         super().__init__("KMeans", n_clusters)
 
@@ -100,8 +80,7 @@ class KMeans(ClusterMethod):
             n_clusters = self.n_clusters
 
         # now, call fit
-        kmeans = KMeans(n_clusters=self.n_clusters,
-                        init='random')  # NOTE: init=random here implies that we AREN'T using kmeans++
+        kmeans = KMeans(n_clusters=self.n_clusters)
         labels = kmeans.fit_predict(X)
 
         # might want to convert this into a torch tensor?
