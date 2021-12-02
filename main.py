@@ -9,11 +9,12 @@ if __name__ == '__main__':
     """
     We'll run all the experiments in this function
     """
-    models = [MultiModalLateFusionModelInterface, MiddleFusionModel]
-    query_function_names = ["RANDOM", "MIN_MAX", "MIN_MARGIN", "MAX_ENTROPY", "CLUSTER_MARGIN", "BADGE"]
+    models = [MiddleFusionModel, MultiModalLateFusionModelInterface]
+    #query_function_names = ["RANDOM", "MIN_MAX", "MIN_MARGIN", "MAX_ENTROPY", "CLUSTER_MARGIN", "BADGE"]
+    query_function_names = ["CLUSTER_MARGIN", "BADGE"]
     options = {
-        "CLUSTER_MARGIN": [KMeans, KMeansPlusPlus, AgglomerativeCluster, GMM],
-        "BADGE": [KMeansPlusPlusSeeding, WeightedKMeansSampling]
+        "CLUSTER_MARGIN": [KMeans(), KMeansPlusPlus(), AgglomerativeCluster(), GMM()],
+        "BADGE": [KMeansPlusPlusSeeding(), WeightedKMeansSampling()]
     }
     initial_train_data_fractions = [0.001, 0.001, 0.005, 0.01, 0.05]
     active_learning_batch_sizes = [32, 64, 32, 32, 32, 32]
@@ -21,6 +22,10 @@ if __name__ == '__main__':
     test_repeat_counts = [10, 10, 8, 8, 5]
     experiment_configs = get_experiment_configs(initial_train_data_fractions, active_learning_batch_sizes,
                                                 training_epochs, test_repeat_counts)
+
+    """FOR TEST"""
+    experiment_configs = [ExperimentConfig(0.05, 64, 32, 4, 2)] # limit to one config
+    """END TEST CODE"""
     exp = Experiment(models=models, query_function_names=query_function_names,
                      query_function_name_to_extra_options=options, experiment_configs=experiment_configs)
     exp.run_experiments()

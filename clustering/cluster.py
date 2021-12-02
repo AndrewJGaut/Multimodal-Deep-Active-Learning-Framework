@@ -23,6 +23,9 @@ class ClusterMethod:
     def convert_to_numpy(self, X):
         return X.cpu().detach().numpy()
 
+    def name(self):
+        return self.method_name
+
 
 class AgglomerativeCluster(ClusterMethod):
     def __init__(self, n_clusters=10, linkage='average'):
@@ -77,8 +80,8 @@ class KMeansPlusPlus(ClusterMethod):
             n_clusters = self.n_clusters
 
         # now, call fit
-        kmeans = KMeans(init='k-means++',
-                        n_clusters=self.n_clusters)  # NOTE: init=random here implies that we AREN'T using kmeans++
+        kmeans = KMeans(n_clusters=self.n_clusters,
+                        init='k-means++')  # NOTE: init=random here implies that we AREN'T using kmeans++
         labels = kmeans.fit_predict(X)
 
         # might want to convert this into a torch tensor?
@@ -97,8 +100,8 @@ class KMeans(ClusterMethod):
             n_clusters = self.n_clusters
 
         # now, call fit
-        kmeans = KMeans(init='random',
-                        n_clusters=self.n_clusters)  # NOTE: init=random here implies that we AREN'T using kmeans++
+        kmeans = KMeans(n_clusters=self.n_clusters,
+                        init='random')  # NOTE: init=random here implies that we AREN'T using kmeans++
         labels = kmeans.fit_predict(X)
 
         # might want to convert this into a torch tensor?

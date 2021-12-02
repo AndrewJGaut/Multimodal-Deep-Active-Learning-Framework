@@ -114,7 +114,11 @@ class MiddleFusionNet(torch.nn.Module):
             nn.ReLU(inplace=True),
         )
         self.final_linear = nn.Linear(1024*2, num_classes)
-    def forward(self, x1: torch.Tensor, x2: torch.Tensor, x2_image_counts: torch.Tensor) -> torch.Tensor:
+    def forward(self, x1: torch.Tensor, x2: torch.Tensor, x2_image_counts: torch.Tensor = None) -> torch.Tensor:
+        """FOR NOW, assume we have all the images in the sequence"""
+        # x1, x2, x2_image_counts = x
+        x2_image_counts = torch.from_numpy(np.ones(x2.shape[0]) * x2.shape[1])  # x_2.shape[1] is the max num images
+
         x1_features = self.conv1(x1)
         x1_features = self.avgpool1(x1_features)
         x1_features = torch.flatten(x1_features, 1)
@@ -123,6 +127,7 @@ class MiddleFusionNet(torch.nn.Module):
         x2_embeddings = []
         for count, x2_image_stack in zip(x2_image_counts,x2):
             if count > 0:
+                count = count.int()
                 cur_x2_features = self.conv2(x2_image_stack[0:count])
                 cur_x2_features = self.avgpool2(cur_x2_features)
                 cur_x2_features = torch.flatten(cur_x2_features, 1)
@@ -143,7 +148,7 @@ class MiddleFusionModel(ModelInterface):
     Instantiate the middle fusion model.
     '''
     def __init__(self, query_function_name: str, active_learning_batch_size: int = 32, extra_query_option=None,
-                 random_seed=None, train_verbose=True):
+                 random_seed=None, train_verbose=False):
         self.query_function_name = query_function_name
         self.active_learning_batch_size = active_learning_batch_size
         self.extra_query_option = extra_query_option
@@ -156,7 +161,7 @@ class MiddleFusionModel(ModelInterface):
 
         self.reset()
 
-        self._name = "Multimodal middle fusion model based on AlexNet"
+        self._name = "Multimodal-middle-fusion-model-based-on-AlexNet"
 
     def reset(self):
         self.model = MiddleFusionNet(num_classes=4, random_seed=self.random_seed)
@@ -202,7 +207,7 @@ class MiddleFusionModel(ModelInterface):
     '''
     def name(self) -> str:
         if self._name is None:
-            return "Multimodal middle fusion model based on AlexNet"
+            return "Multimodal-middle-fusion-model-based-on-AlexNet"
         return self._name
 
     '''
@@ -213,22 +218,29 @@ class MiddleFusionModel(ModelInterface):
         return self.model.details()
 
     def train(self, x:List[np.ndarray], y: np.ndarray) -> None:
-        x1, x2, x2_image_counts = x
-        batch_size = x.shape[0] # infer batch size from input
+        """FOR NOW, assume we have all the images in the sequence"""
+        #x1, x2, x2_image_counts = x
+        x1, x2 = x
+        x2_image_counts = np.ones(x2.shape[0]) * x2.shape[1] # x_2.shape[1] is the max num images
+
         torch.manual_seed(0) # comment this line out to increase variation across experiments
         self.model = train_model_given_numpy_arrays(self.model, x1, x2, x2_image_counts, y,
                                                     self._criterion, self._optimizer,
-                                                    1, batch_size, verbose=self.train_verbose)
+                                                    self.TRAINING_MINIBATCH_SIZE, verbose=self.train_verbose)
 
 
     def predict(self, x:List[np.ndarray]):
-        x1, x2, x2_image_counts = x
+        """FOR NOW, assume we have all the images in the sequence"""
+        # x1, x2, x2_image_counts = x
+        x1, x2 = x
+        x2_image_counts = np.ones(x2.shape[0]) * x2.shape[1]  # x_2.shape[1] is the max num images
+
         self.model.eval()
         x1 = torch.tensor(x1)
         x2 = torch.tensor(x2)
         x2_image_counts = torch.tensor(x2_image_counts)
         dataset = TensorDataset(x1,x2,x2_image_counts)
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, num_workers=0, shuffle=False)
+        dataloader = DataLoader(dataset, batch_size=self.TRAINING_MINIBATCH_SIZE, num_workers=0, shuffle=False)
         preds_list = []
         for (x1,x2,x2_image_counts,) in dataloader:
             x1 = x1.to(device)

@@ -26,7 +26,7 @@ import traceback
 
 def get_experiment_configs(initial_train_data_fractions, active_learning_batch_sizes, training_epochs, test_repeat_counts):
     experiment_configs = list()
-    for i in range(initial_train_data_fractions):
+    for i in range(len(initial_train_data_fractions)):
         experiment_configs.append(ExperimentConfig(initial_train_data_fraction = initial_train_data_fractions[i],
                                                    active_learning_batch_size=active_learning_batch_sizes[i],
                                                    training_epochs=training_epochs[i],
@@ -38,7 +38,7 @@ def get_experiment_configs(initial_train_data_fractions, active_learning_batch_s
 class ExperimentConfig:
     def __init__(self, initial_train_data_fraction=0.05, final_model_layer_len=64,
                  active_learning_batch_size=256, training_epochs=4, test_repeat_count=2):
-        self.test_data_fraction = initial_train_data_fraction
+        self.initial_train_data_fraction = initial_train_data_fraction
         self.final_model_layer_len = final_model_layer_len
 
         self.active_learning_batch_size = active_learning_batch_size
@@ -46,8 +46,8 @@ class ExperimentConfig:
         self.test_repeat_count = test_repeat_count
 
     def __str__(self):
-        return ",".join([self.test_data_fraction, self.final_model_layer_len, self.active_learning_batch_size,
-                         self.training_epochs, self.test_repeat_count])
+        params = [self.initial_train_data_fraction, self.final_model_layer_len, self.active_learning_batch_size, self.training_epochs, self.test_repeat_count]
+        return ",".join([str(x) for x in params])
 
 class Experiment:
 
@@ -103,15 +103,17 @@ class Experiment:
         # Convert y to one-hot array
         y_all = torch.eye(self.num_classes)[y_all]
 
-        #return main_image_all.numpy()[:600], secondary_images_all.numpy()[:600], y_all.numpy()[:600]
-        return main_image_all.numpy(), secondary_images_all.numpy(), y_all.numpy()
+        """TEST CODE"""
+        return main_image_all.numpy()[:600], secondary_images_all.numpy()[:600], y_all.numpy()[:600]
+        #return main_image_all.numpy(), secondary_images_all.numpy(), y_all.numpy()
+        """END TEST CODE"""
 
 
     def get_plot_name(self, model_name, query_function_name, experiment_config, extra_option=None):
         output_file_extension = ".png"
         output_file_name = f"{model_name}_{query_function_name}_{str(experiment_config)}"
         if extra_option is not None:
-            output_file_name += f"_{extra_option.method_name}"
+            output_file_name += f"_{extra_option.name()}"
         return os.path.join("outputs", output_file_name + output_file_extension)
 
     def plot(self, outfile_path): #model_name, active_learning_method):
@@ -137,21 +139,23 @@ class Experiment:
             for model in self.models:
                 for query_function_name in self.query_function_names:
                     try:
-                        print("working on {}".format(curr_model.name()))
+
                         if query_function_name in self.query_function_name_to_extra_options:
-                            for extra_option in self.query_function_name_to_extra_options:
+                            for extra_option in self.query_function_name_to_extra_options[query_function_name]:
                                 curr_model = model(query_function_name, self.tester.ACTIVE_LEARNING_BATCH_SIZE,
                                                    extra_query_option=extra_option)
+                                print("working on {}".format(curr_model.name()))
                                 curr_model_outfile_name = self.get_plot_name(curr_model.name(), query_function_name,
                                                                              experiment_config,
                                                                              extra_option=extra_option)
 
-                                curr_model._name = query_function_name + "_" + extra_option.method_name  # this is so that tester will plot it with the correct name
+                                curr_model._name = query_function_name + "_" + extra_option.name()  # this is so that tester will plot it with the correct name
 
                                 self.tester.test_model(curr_model)
                                 self.plot(curr_model_outfile_name)
                         else:
                             curr_model = model(query_function_name, self.tester.ACTIVE_LEARNING_BATCH_SIZE)
+                            print("working on {}".format(curr_model.name()))
                             curr_model_outfile_name = self.get_plot_name(curr_model.name(), query_function_name, experiment_config)
 
                             curr_model._name = query_function_name  # this is so that tester will plot it with the correct name

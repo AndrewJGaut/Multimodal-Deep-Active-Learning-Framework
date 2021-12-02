@@ -133,7 +133,7 @@ class MultiModalLateFusionModelInterface(ModelInterface):
 
         self.reset()
 
-        self._name = "Multimodal late fusion model based on AlexNet"
+        self._name = "Multimodal-late-fusion-model-based-on-AlexNet"
 
     def name(self):
         return self._name #+ self.query_function_name

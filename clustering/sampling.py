@@ -16,6 +16,9 @@ class SampleMethod:
         """
         pass
 
+    def name(self):
+        return self.method_name
+
 
 class KMeansPlusPlusSeeding(SampleMethod):
     def __init__(self, n_samples=None):
