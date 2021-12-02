@@ -20,8 +20,3 @@ if __name__ == '__main__':
                      query_function_name_to_extra_options=options, active_learning_batch_size=32,
                      training_epochs=10, test_repeat_count=4)
     exp.run_experiments()
-
-
-
-
-

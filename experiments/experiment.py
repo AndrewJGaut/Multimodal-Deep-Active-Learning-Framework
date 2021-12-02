@@ -149,3 +149,11 @@ class Experiment:
                     print(f"Got exception {e} for model {curr_model.name()} with stack trace:\n{traceback.print_exc()}")
 
             plt.clf()
+
+
+    def gradient_embedding_experiment(self):
+        """
+        This is to try and basically cluster the gradient embeddings and maybe do some PCA to just see what happens
+        :return:
+        """
+        pass
