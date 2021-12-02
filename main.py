@@ -1,6 +1,6 @@
 from experiments.experiment import Experiment, ExperimentConfig, get_experiment_configs
 from models.multimodal.late_fusion_model_torch import MultiModalLateFusionModelInterface
-from models.multimodal.middle_fusion_model import ActiveLearningModel
+from models.multimodal.middle_fusion_model import MiddleFusionModel
 from models.multimodal.middle_fusion_model import MiddleFusionModel
 from clustering.cluster import KMeans, KMeansPlusPlus, AgglomerativeCluster, GMM
 from clustering.sampling import KMeansPlusPlusSeeding, WeightedKMeansSampling
@@ -9,8 +9,7 @@ if __name__ == '__main__':
     """
     We'll run all the experiments in this function
     """
-    models = [MultiModalLateFusionModelInterface, ActiveLearningModel]
-    #models = [MiddleFusionModel]
+    models = [MultiModalLateFusionModelInterface, MiddleFusionModel]
     query_function_names = ["RANDOM", "MIN_MAX", "MIN_MARGIN", "MAX_ENTROPY", "CLUSTER_MARGIN", "BADGE"]
     options = {
         "CLUSTER_MARGIN": [KMeans, KMeansPlusPlus, AgglomerativeCluster, GMM],

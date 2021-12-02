@@ -22,17 +22,14 @@ class BADGEQueryFunction:
         model (nn.Module):                          Pytorch model which converts batch of inputs
                                                     into batch of normalized class probabilities
         last_layer_model_params (nn.Parameter):     Reference to final layer parameters in model
-        margin_batch_size (int):                    The number of points to select based on high
-                                                    uncertainty
         target_batch_size (int):                    The number of points to select in one active
                                                     learning batch
     '''
 
-    def __init__(self, model: nn.Module, last_layer_model_params: nn.Parameter, margin_batch_size: int,
+    def __init__(self, model: nn.Module, last_layer_model_params: nn.Parameter,
                  target_batch_size: int, sample_method: SampleMethod=KMeansPlusPlusSeeding()) -> None:
         self.model = model
         self.last_layer_model_params = last_layer_model_params
-        self.margin_batch_size = margin_batch_size
         self.target_batch_size = target_batch_size
         self.sample_method = sample_method
 

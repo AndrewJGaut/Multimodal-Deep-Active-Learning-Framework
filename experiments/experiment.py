@@ -140,7 +140,8 @@ class Experiment:
                         print("working on {}".format(curr_model.name()))
                         if query_function_name in self.query_function_name_to_extra_options:
                             for extra_option in self.query_function_name_to_extra_options:
-                                curr_model = model(query_function_name, extra_query_option=extra_option)
+                                curr_model = model(query_function_name, self.tester.ACTIVE_LEARNING_BATCH_SIZE,
+                                                   extra_query_option=extra_option)
                                 curr_model_outfile_name = self.get_plot_name(curr_model.name(), query_function_name,
                                                                              experiment_config,
                                                                              extra_option=extra_option)
@@ -150,7 +151,7 @@ class Experiment:
                                 self.tester.test_model(curr_model)
                                 self.plot(curr_model_outfile_name)
                         else:
-                            curr_model = model(query_function_name)
+                            curr_model = model(query_function_name, self.tester.ACTIVE_LEARNING_BATCH_SIZE)
                             curr_model_outfile_name = self.get_plot_name(curr_model.name(), query_function_name, experiment_config)
 
                             curr_model._name = query_function_name  # this is so that tester will plot it with the correct name

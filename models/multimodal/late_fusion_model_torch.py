@@ -155,7 +155,6 @@ class MultiModalLateFusionModelInterface(ModelInterface):
         elif self.query_function_name == "BADGE":
             self.badge = BADGEQueryFunction(
                 self.model, [self.model.post_fusion_layer.weight],
-                margin_batch_size=2 * self.active_learning_batch_size,
                 target_batch_size=self.active_learning_batch_size,
                 sample_method=self.extra_query_option
             )

@@ -1,42 +1,18 @@
-from __future__ import print_function
-from __future__ import division
-
 import numpy as np
+from torch import random
 from test_framework.model_interface import ModelInterface
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 import time
+from typing import List
 
-from active_learning.cluster_margin import *
-from active_learning.badge import *
-
-# Adapted from https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html
-# for kaggle satellite image classification dataset https://www.kaggle.com/mahmoudreda55/satellite-image-classification
-# and then basic active learning was applied.
-
-
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import numpy as np
-import torchvision
-from torchvision import datasets, models, transforms
-from torch.utils.data import TensorDataset, DataLoader
-import matplotlib.pyplot as plt
-from utils.pytorch_finetuning_utils import train_model, train_model_given_numpy_arrays, initialize_model
-print("PyTorch Version: ",torch.__version__)
-print("Torchvision Version: ",torchvision.__version__)
-import sys
-sys.path.append("..")
-from test_framework.model_interface import ModelInterface
-from test_framework.tester import Tester
-from utils.data_utils import get_kaggle_satellite_image_classification_dataset_as_numpy_arrays
 from active_learning.categorical_query_functions import *
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-def train_model_given_numpy_arrays(model, x1, x2, x2_image_counts, y, criterion, optimizer, num_epochs=25, batch_size=8, verbose=True):
+def train_model_given_numpy_arrays(model, x1, x2, x2_image_counts, y, criterion, optimizer, batch_size=8, verbose=True):
+    NUM_EPOCHS = 1 # the number of training epochs is set in the Tester class
 
     # Convert data to data loader so that it isn't allocated on the GPU all at once.
     x1_tensor = torch.tensor(x1)
@@ -49,7 +25,7 @@ def train_model_given_numpy_arrays(model, x1, x2, x2_image_counts, y, criterion,
 
     since = time.time()
 
-    for epoch in range(num_epochs):
+    for epoch in range(NUM_EPOCHS):
         # Each epoch has a training and validation phase
         model.train()  # Set model to training mode
 
@@ -86,7 +62,7 @@ def train_model_given_numpy_arrays(model, x1, x2, x2_image_counts, y, criterion,
         epoch_acc = running_corrects.double() / len(y)
         if verbose:
             print('Epoch {}/{} - Train Loss: {:.4f} Acc: {:.4f}'.format(
-                epoch, num_epochs - 1, epoch_loss, epoch_acc))
+                epoch, NUM_EPOCHS - 1, epoch_loss, epoch_acc))
 
     if verbose:
         print()
@@ -107,35 +83,48 @@ Defines a wrapper for a middle fusion model based on AlexNet
 # https://pytorch.org/vision/master/_modules/torchvision/models/alexnet.html
 
 class MiddleFusionNet(torch.nn.Module):
-    def __init__(self, num_classes: int = 4, dropout: float = 0.5) -> None:
+    def __init__(self, num_classes: int = 4, dropout: float = 0.5, random_seed=None) -> None:
+        if random_seed is not None:
+            torch.manual_seed(random_seed)
         super(MiddleFusionNet, self).__init__()
         self.num_classes = num_classes
 
-        self.features = nn.Sequential(
+        self.conv1 = nn.Sequential(
             nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=3, stride=2),
         )
-        self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
-        self.classifier = nn.Sequential(
+        self.avgpool1 = nn.AdaptiveAvgPool2d((6, 6))
+        self.linear1 = nn.Sequential(
+            nn.Dropout(p=dropout),
+            nn.Linear(2304, 1024),
+            nn.ReLU(inplace=True),
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+        )
+        self.avgpool2 = nn.AdaptiveAvgPool2d((6, 6))
+        self.linear2 = nn.Sequential(
             nn.Dropout(p=dropout),
             nn.Linear(2304, 1024),
             nn.ReLU(inplace=True),
         )
         self.final_linear = nn.Linear(1024*2, num_classes)
     def forward(self, x1: torch.Tensor, x2: torch.Tensor, x2_image_counts: torch.Tensor) -> torch.Tensor:
-        x1_features = self.features(x1)
-        x1_features = self.avgpool(x1_features)
+        x1_features = self.conv1(x1)
+        x1_features = self.avgpool1(x1_features)
         x1_features = torch.flatten(x1_features, 1)
-        x1_embeddings = self.classifier(x1_features)
+        x1_embeddings = self.linear1(x1_features)
 
         x2_embeddings = []
         for count, x2_image_stack in zip(x2_image_counts,x2):
             if count > 0:
-                cur_x2_features = self.features(x2_image_stack[0:count])
-                cur_x2_features = self.avgpool(cur_x2_features)
+                cur_x2_features = self.conv2(x2_image_stack[0:count])
+                cur_x2_features = self.avgpool2(cur_x2_features)
                 cur_x2_features = torch.flatten(cur_x2_features, 1)
-                cur_x2_embeddings = self.classifier(cur_x2_features)
+                cur_x2_embeddings = self.linear2(cur_x2_features)
                 x2_embeddings.append(torch.mean(cur_x2_embeddings,axis=0))
             else:
                 x2_embeddings.append(torch.zeros(1024).to(device))
@@ -151,22 +140,16 @@ class MiddleFusionModel(ModelInterface):
     '''
     Instantiate the middle fusion model.
     '''
-    def __init__(self, query_function_name,
-                 name=None, details=None,
-                num_epochs=3, batch_size=8, train_verbose=True,
-                query_function=None):
-        self.model = MiddleFusionNet(num_classes=4)
-        self._name = name
-        self._details = details
+    def __init__(self, query_function_name, active_learning_batch_size = 32,
+                 random_seed=None, train_verbose=True):
+        self.query_function_name = query_function_name
+        self.model = MiddleFusionNet(num_classes=4,random_seed=random_seed)
+        self._name = self.model.name()
+        self._details = self.model.details()
 
         # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model.to(device)
-        self._name = name
-        self._details = details
-        self.num_epochs = num_epochs
-        self.batch_size = batch_size
         self.train_verbose = train_verbose
-        self.query_function = query_function
 
         params_to_update = self.model.parameters()
 
@@ -176,36 +159,6 @@ class MiddleFusionModel(ModelInterface):
 
         # store criterion
         self._criterion = nn.CrossEntropyLoss()
-
-
-
-        self.query_function_name = query_function_name
-        # For cluster-margin active learning algorithm, clusters must be
-        # saved between queries
-        if self.query_function_name == "CLUSTER_MARGIN":
-            raise NotImplementedError("Cluster margin is not yet implemented for late fusion")
-            """
-            self.cluster_margin = ClusterMarginQueryFunction(
-                self.model, None, # [self.model.post_fusion_layer.weight],
-                margin_batch_size=2 * self.batch_size,
-                target_batch_size=self.batch_size
-            )
-            self.badge = None
-            """
-        elif self.query_function_name == "BADGE":
-            self.badge = BADGEQueryFunction(
-                self.model, None,
-                margin_batch_size=2 * self.batch_size,
-                target_batch_size=self.batch_size
-            )
-            self.cluster_margin = None
-        else:
-            self.cluster_margin = None
-            self.badge = None
-
-
-
-
 
 
     # IDENTIFIER METHODS
@@ -226,15 +179,18 @@ class MiddleFusionModel(ModelInterface):
     def details(self) -> str:
         return self.model.details()
 
-    def train(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray, y: np.ndarray) -> None:
-        # x1,x2 = np.swapaxes(train_x,0,1)
+    def train(self, x:List[np.ndarray], y: np.ndarray) -> None:
+        x1, x2, x2_image_counts = x
+        batch_size = x.shape[0] # infer batch size from input
+        torch.manual_seed(0) # comment this line out to increase variation across experiments
         self.model = train_model_given_numpy_arrays(self.model, x1, x2, x2_image_counts, y,
                                                     self._criterion, self._optimizer,
-                                                    self.num_epochs, self.batch_size, verbose=self.train_verbose)
+                                                    1, batch_size, verbose=self.train_verbose)
 
-    def predict(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray):
+
+    def predict(self, x:List[np.ndarray]):
+        x1, x2, x2_image_counts = x
         self.model.eval()
-        # x1,x2 = np.swapaxes(test_x,0,1)
         x1 = torch.tensor(x1)
         x2 = torch.tensor(x2)
         x2_image_counts = torch.tensor(x2_image_counts)
@@ -248,154 +204,26 @@ class MiddleFusionModel(ModelInterface):
             preds_list.append(self.model(x1,x2,x2_image_counts).cpu().detach().numpy())
         return np.vstack(preds_list)
 
-    def predict_proba(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray) -> np.ndarray:
+    def predict_proba(self, x:List[np.ndarray]) -> np.ndarray:
         self.model.eval()
-        softmax = lambda x: np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
-        softmax_outputs = softmax(self.predict(x1, x2, x2_image_counts))
+        softmax = lambda s: np.exp(s) / np.sum(np.exp(s), axis=-1, keepdims=True)
+        softmax_outputs = softmax(self.predict(x))
         return softmax_outputs
 
-    """
-    def query(self, x1: np.ndarray, x2: np.ndarray, x2_image_counts: np.ndarray, labeling_batch_size: int) -> np.ndarray:
-        softmax_outputs = self.predict_proba(x1, x2, x2_image_counts)
-        indices = self.active_learning_function(softmax_outputs, labeling_batch_size)
-        return indices
-    """
-    def query(self, unlabeled_data: np.ndarray, labeling_batch_size: int) -> np.ndarray:
-        #softmax = lambda x: np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
-        #softmax_outputs = softmax(self.predict(unlabeled_data))
-
+    def query(self, unlabeled_x:List[np.ndarray], labeling_batch_size: int) -> np.ndarray:
         if self.query_function_name == "RANDOM":
-            data_size = unlabeled_data[0].shape[0]
-            return np.random.choice(np.arange(data_size), size=labeling_batch_size, replace=False)
-
-        if self.query_function_name == "MIN_MAX":
-            return MIN_MAX(self.predict(unlabeled_data), labeling_batch_size)
-
-        if self.query_function_name == "MIN_MARGIN":
-            return MIN_MARGIN(self.predict(unlabeled_data), labeling_batch_size)
-
-        if self.query_function_name == "MAX_ENTROPY":
-            return MAX_ENTROPY(self.predict(unlabeled_data), labeling_batch_size)
-
-        if self.query_function_name == "CLUSTER_MARGIN":
-            return self.cluster_margin.query(unlabeled_data)
-
-        if self.query_function_name == "BADGE":
-            return self.badge.query(unlabeled_data)
-
-        raise ValueError(f"Unrecognized query function name: {self.query_function_name}")
-
-
-class ActiveLearningModel(ModelInterface):
-    def __init__(self, query_function_name, feature_extract=True,
-                 num_epochs=8, batch_size=32, train_verbose=True):
-
-        #model_ft, input_size = initialize_model("squeezenet", 4, feature_extract, use_pretrained=True)
-        self.model = MiddleFusionModel #model_ft
-        #self.model.to(device)
-
-        self.query_function_name = query_function_name
-
-        # Gather the parameters to be optimized/updated in this run. If we are
-        #  finetuning we will be updating all parameters. However, if we are
-        #  doing feature extract method, we will only update the parameters
-        #  that we have just initialized, i.e. the parameters with requires_grad
-        #  is True.
-        params_to_update = self.model.parameters()
-        verbose = False
-        if verbose:
-            print("Params to learn:")
-        if feature_extract:
-            params_to_update = []
-            for name, param in self.model.named_parameters():
-                if param.requires_grad == True:
-                    params_to_update.append(param)
-                    if verbose:
-                        print("\t", name)
-        elif verbose:
-            for name, param in self.model.named_parameters():
-                if param.requires_grad == True:
-                    print("\t", name)
-
-        # Observe that all parameters are being optimized
-        optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
-        self._optimizer = optimizer_ft
-
-        # store criterion
-        self._criterion = nn.CrossEntropyLoss()
-
-        self.num_epochs = num_epochs
-        self.batch_size = batch_size
-        self.train_verbose = train_verbose
-
-        # For cluster-margin active learning algorithm, clusters must be
-        # saved between queries
-        if self.query_function_name == "CLUSTER_MARGIN":
-            raise NotImplementedError("Cluster margin not yet implemented for middle fusion model")
-            """
-            self.cluster_margin = ClusterMarginQueryFunction(
-                self.model, [self.model.post_fusion_layer.weight],
-                margin_batch_size=2 * self.active_learning_batch_size,
-                target_batch_size=self.active_learning_batch_size
-            )
-            self.badge = None
-            """
+            return RANDOM(self.predict_proba(unlabeled_x), labeling_batch_size)
+        elif self.query_function_name == "MIN_MAX":
+            return MIN_MAX(self.predict_proba(unlabeled_x), labeling_batch_size)
+        elif self.query_function_name == "MIN_MARGIN":
+            return MIN_MARGIN(self.predict_proba(unlabeled_x), labeling_batch_size)
+        elif self.query_function_name == "MAX_ENTROPY":
+            return MAX_ENTROPY(self.predict_proba(unlabeled_x), labeling_batch_size)
+        elif self.query_function_name == "CLUSTER_MARGIN":
+            # return self.cluster_margin.query(unlabeled_data)
+            pass
         elif self.query_function_name == "BADGE":
-            self.badge = BADGEQueryFunction(
-                self.model, None,
-                margin_batch_size=2 * self.batch_size,
-                target_batch_size=self.batch_size
-            )
-            self.cluster_margin = None
+            #return self.badge.query(unlabeled_data)
+            pass
         else:
-            self.cluster_margin = None
-            self.badge = None
-
-    def name(self) -> str:
-        return self.model.name
-
-    def details(self) -> str:
-        return self.model.details
-
-    def train(self, train_x: np.ndarray, train_y: np.ndarray) -> None:
-        self.model = train_model_given_numpy_arrays(self.model, train_x, train_y, self._criterion, self._optimizer,
-                                                    self.num_epochs, self.batch_size, verbose=self.train_verbose)
-
-    def predict(self, test_x: np.ndarray):
-        self.model.eval()
-        x_tensor = torch.tensor(test_x)
-        dataset = TensorDataset(x_tensor)
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, num_workers=0, shuffle=False)
-        preds_list = []
-        for (inputs,) in dataloader:
-            inputs = inputs.to(device)
-            preds_list.append(self.model(inputs).cpu().detach().numpy())
-        return np.vstack(preds_list)
-
-    def query(self, unlabeled_data: np.ndarray, labeling_batch_size: int) -> np.ndarray:
-        #softmax = lambda x: np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
-        #softmax_outputs = softmax(self.predict(unlabeled_data))
-
-        if self.query_function_name == "RANDOM":
-            data_size = unlabeled_data[0].shape[0]
-            return np.random.choice(np.arange(data_size), size=labeling_batch_size, replace=False)
-
-        if self.query_function_name == "MIN_MAX":
-            return MIN_MAX(self.predict(unlabeled_data), labeling_batch_size)
-
-        if self.query_function_name == "MIN_MARGIN":
-            return MIN_MARGIN(self.predict(unlabeled_data), labeling_batch_size)
-
-        if self.query_function_name == "MAX_ENTROPY":
-            return MAX_ENTROPY(self.predict(unlabeled_data), labeling_batch_size)
-
-        if self.query_function_name == "CLUSTER_MARGIN":
-            return self.cluster_margin.query(unlabeled_data)
-
-        if self.query_function_name == "BADGE":
-            return self.badge.query(unlabeled_data)
-
-        raise ValueError(f"Unrecognized query function name: {self.query_function_name}")
-
-        #indices = QUERY_FUNCTION(softmax_outputs, labeling_batch_size)
-        #return indices
+            raise ValueError(f"Unrecognized query function name: {self.query_function_name}")
