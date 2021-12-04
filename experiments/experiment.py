@@ -53,13 +53,16 @@ class Experiment:
 
     def __init__(self, name, models, query_function_names,
                  query_function_name_to_extra_options=dict(),
-                 experiment_configs = list(), is_test=False):
+                 experiment_configs = list(), grayscale=False,
+                 is_test=False):
         """
         :param name
         :param models:
         :param query_function_names:
         :param query_function_name_to_extra_options:
         :param experiment_configs:
+        :param grayscale (bool): if True, then grayscale all the images for this experiment so that networks can no
+        longer use color to differentiate.
         :param is_test (bool): true if we want to load only part of the data to test the framework.
         """
         self.name = name
@@ -74,7 +77,9 @@ class Experiment:
 
         self.experiment_configs = experiment_configs
 
+        self.grayscale = grayscale
         self.is_test = is_test
+
         self.tester = None
 
 
@@ -82,22 +87,32 @@ class Experiment:
         """
 
         :param max_samples:
+        :param grayscale: if true, then grayscale all the images. We'll do this in order to see how color affects
+        the model (making images grayscale might make the model's job harder, which could increase the utility
+        of some of the active learning methods perhaps).
         :return:
         """
         def transform_to_multimodal(image):
-            main_image = transforms.Compose([
+            main_image_transforms = [
                 transforms.CenterCrop(self.main_image_dims),
                 transforms.ToTensor(),
                 # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-            ])(image.copy())
+            ]
+            secondary_image_transforms = [
+                transforms.RandomCrop(self.secondary_img_dims),
+                transforms.ToTensor(),
+                # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                transforms.Lambda(lambda img: transforms.functional.adjust_contrast(img, contrast_factor=0.8))
+            ]
+            if self.grayscale:
+                main_image_transforms.append(transforms.Grayscale(len(image.getbands())))
+                secondary_image_transforms.append(transforms.Grayscale(len(image.getbands())))
+
+
+            main_image = transforms.Compose()(image.copy())
 
             secondary_images = [
-                transforms.Compose([
-                    transforms.RandomCrop(self.secondary_img_dims),
-                    transforms.ToTensor(),
-                    # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                    transforms.Lambda(lambda img: transforms.functional.adjust_contrast(img, contrast_factor=0.8))
-                ])(image.copy()) for i in range(self.max_secondary_images)
+                transforms.Compose()(image.copy()) for i in range(self.max_secondary_images)
                 ]
             secondary_images = torch.stack(secondary_images)
 
@@ -121,6 +136,8 @@ class Experiment:
     def get_plot_name(self, model_name, experiment_config):
         output_file_extension = ".png"
         output_file_name = f"{model_name}_{str(experiment_config)}"
+        if self.grayscale:
+            output_file_name += f"_{GRAYSCALE}"
         return os.path.join("outputs", self.name, output_file_name + output_file_extension)
 
     def plot(self, outfile_path): #model_name, active_learning_method):
