@@ -13,7 +13,7 @@ ALL_OPTIONS = {
 
 BASELINE_CONFIGS = [
     ExperimentConfig(
-        initial_train_data_fraction=0.0001,
+        initial_train_data_fraction=0.0005, # start with two data points (this fraction works for this b/c size of our dataset is fixed)
         active_learning_batch_size=1,
         training_epochs=20,
         test_repeat_count=8
@@ -52,7 +52,7 @@ def recreate_late_fusion_notebook_experiment():
 
 def very_quick_test():
     exp = Experiment(name="very_quick_test",
-                     models=[MultiModalLateFusionModelInterface],
+                     models=[MiddleFusionModel],
                      query_function_names=ALL_QUERY_FUNCTION_NAMES,
                      experiment_configs=[ExperimentConfig(
                          initial_train_data_fraction=0.001, final_model_layer_len=64,
@@ -62,7 +62,8 @@ def very_quick_test():
                              initial_train_data_fraction=0.001, final_model_layer_len=64,
                              active_learning_batch_size=16, training_epochs=1, test_repeat_count=1
                          )
-                     ])
+                     ],
+                     is_test=True)
     exp.run_experiments()
 
 def new_experiments():
