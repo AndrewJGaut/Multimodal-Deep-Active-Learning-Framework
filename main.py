@@ -92,7 +92,7 @@ def cluster_margin_cluster_methods_experiments():
         models=ALL_MODELS,
         query_function_names=["CLUSTER_MARGIN"],
         options=cluster_margin_options,
-        experiment_configs=BASELINE_CONFIGS
+        query_function_name_to_extra_options=BASELINE_CONFIGS
     )
     exp.run_experiments()
 
@@ -108,7 +108,7 @@ def badge_sample_methods_experiments():
         name="badge_sample_methods_experiments",
         models=ALL_MODELS,
         query_function_names=["BADGE"],
-        options=badge_options,
+        query_function_name_to_extra_options=badge_options,
         experiment_configs=BASELINE_CONFIGS
     )
     exp.run_experiments()

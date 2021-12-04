@@ -135,15 +135,17 @@ class Experiment:
         x_main, x_secondary, y = self.load_dataset()
 
         for experiment_config in self.experiment_configs:
-
-            # configure the tester for the experiment config
-            self.tester = Tester([x_main, x_secondary], y)
-            self.tester.INITIAL_TRAIN_DATA_FRACTION = experiment_config.initial_train_data_fraction
-            self.tester.ACTIVE_LEARNING_BATCH_SIZE = experiment_config.active_learning_batch_size
-            self.tester.TRAINING_EPOCHS = experiment_config.training_epochs
-            self.tester.TEST_REPEAT_COUNT = experiment_config.test_repeat_count
-
             for model in self.models:
+                # configure the tester for the experiment config
+                # do this every time so that the plots will clear
+                self.tester = Tester([x_main, x_secondary], y)
+                self.tester.INITIAL_TRAIN_DATA_FRACTION = experiment_config.initial_train_data_fraction
+                self.tester.ACTIVE_LEARNING_BATCH_SIZE = experiment_config.active_learning_batch_size
+                self.tester.TRAINING_EPOCHS = experiment_config.training_epochs
+                self.tester.TEST_REPEAT_COUNT = experiment_config.test_repeat_count
+
+
+
                 model_name = ""
 
                 for query_function_name in self.query_function_names:
@@ -174,7 +176,6 @@ class Experiment:
 
                 curr_model_outfile_name = self.get_plot_name(model_name, experiment_config)
                 self.plot(curr_model_outfile_name)
-                plt.clf()
 
 
     def gradient_embedding_experiment(self):
