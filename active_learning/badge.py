@@ -27,11 +27,16 @@ class BADGEQueryFunction:
     '''
 
     def __init__(self, model: nn.Module, last_layer_model_params: nn.Parameter,
-                 target_batch_size: int, sample_method: SampleMethod=KMeansPlusPlusSeeding()) -> None:
+                 target_batch_size: int, sample_method: SampleMethod) -> None:
+        if sample_method is None:
+            self.sample_method=KMeansPlusPlusSeeding()
+        else:
+            self.sample_method = sample_method
+
         self.model = model
         self.last_layer_model_params = last_layer_model_params
         self.target_batch_size = target_batch_size
-        self.sample_method = sample_method
+
 
 
     '''

@@ -1,7 +1,6 @@
 from collections import deque
 from typing import Tuple, List
 import numpy as np
-from sklearn.cluster import AgglomerativeClustering
 import random
 import torch
 import torch.nn as nn
@@ -43,13 +42,18 @@ class ClusterMarginQueryFunction:
     '''
 
     def __init__(self, model: nn.Module, last_layer_model_params: nn.Parameter, margin_batch_size: int,
-                 target_batch_size: int, cluster_method: ClusterMethod = SklearnAgglomerativeCluster()) -> None:
+                 target_batch_size: int, cluster_method: ClusterMethod) -> None:
+        if cluster_method is None:
+            self.cluster_method = SklearnAgglomerativeCluster()
+        else:
+            self.cluster_method = cluster_method
+
         self.model = model
         self.last_layer_model_params = last_layer_model_params
         self.margin_batch_size = margin_batch_size
         self.target_batch_size = target_batch_size
 
-        self.cluster_method = cluster_method
+
 
         # For storing cluster membership {np array byte string -> int}
         self.sample_to_cluster_id = {}

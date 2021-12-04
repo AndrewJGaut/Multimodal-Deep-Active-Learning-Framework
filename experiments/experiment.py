@@ -51,9 +51,18 @@ class ExperimentConfig:
 
 class Experiment:
 
-    def __init__(self, models, query_function_names,
+    def __init__(self, name, models, query_function_names,
                  query_function_name_to_extra_options=dict(),
-                 experiment_configs = list()):
+                 experiment_configs = list(), is_test=False):
+        """
+        :param name
+        :param models:
+        :param query_function_names:
+        :param query_function_name_to_extra_options:
+        :param experiment_configs:
+        :param is_test (bool): true if we want to load only part of the data to test the framework.
+        """
+        self.name = name
         self.models = models
         self.query_function_names = query_function_names
         self.query_function_name_to_extra_options = query_function_name_to_extra_options
@@ -65,7 +74,7 @@ class Experiment:
 
         self.experiment_configs = experiment_configs
 
-
+        self.is_test = is_test
         self.tester = None
 
 
@@ -103,18 +112,16 @@ class Experiment:
         # Convert y to one-hot array
         y_all = torch.eye(self.num_classes)[y_all]
 
-        """TEST CODE"""
-        #return main_image_all.numpy()[:600], secondary_images_all.numpy()[:600], y_all.numpy()[:600]
-        return main_image_all.numpy(), secondary_images_all.numpy(), y_all.numpy()
-        """END TEST CODE"""
+        if self.is_test:
+            return main_image_all.numpy()[:200], secondary_images_all.numpy()[:200], y_all.numpy()[:200]
+        else:
+            return main_image_all.numpy(), secondary_images_all.numpy(), y_all.numpy()
 
 
-    def get_plot_name(self, model_name, query_function_name, experiment_config, extra_option=None):
+    def get_plot_name(self, model_name, experiment_config):
         output_file_extension = ".png"
-        output_file_name = f"{model_name}_{query_function_name}_{str(experiment_config)}"
-        if extra_option is not None:
-            output_file_name += f"_{extra_option.name()}"
-        return os.path.join("outputs", output_file_name + output_file_extension)
+        output_file_name = f"{model_name}_{str(experiment_config)}"
+        return os.path.join("outputs", self.name, output_file_name + output_file_extension)
 
     def plot(self, outfile_path): #model_name, active_learning_method):
         #outfile_path = self.get_plot_name(model_name, active_learning_method)
@@ -137,34 +144,36 @@ class Experiment:
             self.tester.TEST_REPEAT_COUNT = experiment_config.test_repeat_count
 
             for model in self.models:
+                model_name = ""
+
                 for query_function_name in self.query_function_names:
                     try:
-
                         if query_function_name in self.query_function_name_to_extra_options:
                             for extra_option in self.query_function_name_to_extra_options[query_function_name]:
                                 curr_model = model(query_function_name, self.tester.ACTIVE_LEARNING_BATCH_SIZE,
                                                    extra_query_option=extra_option)
-                                print("working on {}".format(curr_model.name()))
-                                curr_model_outfile_name = self.get_plot_name(curr_model.name(), query_function_name,
-                                                                             experiment_config,
-                                                                             extra_option=extra_option)
-
+                                print("working on model {} with {}".format(curr_model.name(), query_function_name))
+                                model_name = curr_model.name()
                                 curr_model._name = query_function_name + "_" + extra_option.name()  # this is so that tester will plot it with the correct name
 
                                 self.tester.test_model(curr_model)
-                                self.plot(curr_model_outfile_name)
+
                         else:
                             curr_model = model(query_function_name, self.tester.ACTIVE_LEARNING_BATCH_SIZE)
-                            print("working on {}".format(curr_model.name()))
-                            curr_model_outfile_name = self.get_plot_name(curr_model.name(), query_function_name, experiment_config)
+                            print("working on model {} with {}".format(curr_model.name(), query_function_name))
+                            model_name = curr_model.name() # this is so that tester will plot it with the correct name
+                            curr_model._name = query_function_name
 
-                            curr_model._name = query_function_name  # this is so that tester will plot it with the correct name
 
                             self.tester.test_model(curr_model)
-                            self.plot(curr_model_outfile_name)
+
+                            #curr_model_outfile_name = self.get_plot_name(model_name, experiment_config)
+                            #self.plot(curr_model_outfile_name)
                     except Exception as e:
                         print(f"Got exception {e} for model {curr_model.name()} with stack trace:\n{traceback.print_exc()}")
 
+                curr_model_outfile_name = self.get_plot_name(model_name, experiment_config)
+                self.plot(curr_model_outfile_name)
                 plt.clf()
 
 
