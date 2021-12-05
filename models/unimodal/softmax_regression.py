@@ -19,8 +19,7 @@ class SoftmaxRegression(ModelInterface):
         self.clf.fit(train_x, train_y)
 
     def predict(self, test_x: np.ndarray) -> np.ndarray:
-
-        return np.argmax(self.clf.predict_proba(test_x), axis=1)
+        return np.argmax(self.predict_proba(test_x), axis=1)
 
     def predict_proba(self, test_x: np.ndarray) -> np.ndarray:
         if len(test_x.shape) > 2:
@@ -34,7 +33,7 @@ class SoftmaxRegression(ModelInterface):
     So, we find: x* = argmax_x {1 - argmax_y{p(y|x)}} (the x's with the least confident prediction for the highest class)
     """
     def query(self, unlabeled_data: np.ndarray, labeling_batch_size: int) -> np.ndarray:
-        preds = self.clf.predict_proba(unlabeled_data)
+        preds = self.predict_proba(unlabeled_data)
         least_confident_pred_per_x = 1 - np.max(preds, axis=1)
         least_confident_pred_indices = np.argpartition(least_confident_pred_per_x, -1 * labeling_batch_size)[
                                        -1 * labeling_batch_size:]

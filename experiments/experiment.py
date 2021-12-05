@@ -22,6 +22,7 @@ from active_learning.gradient_embedding import compute_gradient_embeddings
 from active_learning.cluster_margin import *
 
 import traceback
+import pdb
 
 
 def get_experiment_configs(initial_train_data_fractions, active_learning_batch_sizes, training_epochs, test_repeat_counts):
@@ -109,10 +110,10 @@ class Experiment:
                 secondary_image_transforms.append(transforms.Grayscale(len(image.getbands())))
 
 
-            main_image = transforms.Compose()(image.copy())
+            main_image = transforms.Compose(main_image_transforms)(image.copy())
 
             secondary_images = [
-                transforms.Compose()(image.copy()) for i in range(self.max_secondary_images)
+                transforms.Compose(secondary_image_transforms)(image.copy()) for i in range(self.max_secondary_images)
                 ]
             secondary_images = torch.stack(secondary_images)
 
@@ -128,7 +129,7 @@ class Experiment:
         y_all = torch.eye(self.num_classes)[y_all]
 
         if self.is_test:
-            return main_image_all.numpy()[:200], secondary_images_all.numpy()[:200], y_all.numpy()[:200]
+            return main_image_all.numpy()[:400], secondary_images_all.numpy()[:400], y_all.numpy()[:400]
         else:
             return main_image_all.numpy(), secondary_images_all.numpy(), y_all.numpy()
 
@@ -137,7 +138,7 @@ class Experiment:
         output_file_extension = ".png"
         output_file_name = f"{model_name}_{str(experiment_config)}"
         if self.grayscale:
-            output_file_name += f"_{GRAYSCALE}"
+            output_file_name += "_{GRAYSCALE}"
         return os.path.join("outputs", self.name, output_file_name + output_file_extension)
 
     def plot(self, outfile_path): #model_name, active_learning_method):

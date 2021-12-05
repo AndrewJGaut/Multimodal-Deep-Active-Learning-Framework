@@ -16,18 +16,32 @@ BASELINE_CONFIGS = [
         initial_train_data_fraction=0.0005, # start with two data points (this fraction works for this b/c size of our dataset is fixed)
         active_learning_batch_size=1,
         training_epochs=20,
-        test_repeat_count=8
+        test_repeat_count=8 #8
     ),
     ExperimentConfig(
         initial_train_data_fraction=0.05,
         active_learning_batch_size=32,
         training_epochs=20,
-        test_repeat_count=8
+        test_repeat_count= 8 # 8
+    ),
+    ExperimentConfig(
+        initial_train_data_fraction=0.05,
+        active_learning_batch_size=64,
+        training_epochs=15,
+        test_repeat_count=4
     )
 ]
 
 
-def first_experiment():
+def run_all_relevant_experiments():
+    main_experiment()
+    cluster_margin_cluster_methods_experiments()
+    badge_sample_methods_experiments()
+    main_experiment(grayscale=True)
+
+
+
+def main_experiment(grayscale=False):
     initial_train_data_fractions = [0.001, 0.001, 0.005, 0.01, 0.05]
     active_learning_batch_sizes = [32, 64, 32, 32, 32, 32]
     training_epochs = [20, 20, 18, 15, 15]
@@ -36,7 +50,8 @@ def first_experiment():
                                                 training_epochs, test_repeat_counts)
 
     exp = Experiment(name="first_experiment", models=ALL_MODELS, query_function_names=ALL_QUERY_FUNCTION_NAMES,
-                     query_function_name_to_extra_options=ALL_OPTIONS, experiment_configs=experiment_configs)
+                     query_function_name_to_extra_options=ALL_OPTIONS, experiment_configs=experiment_configs,
+                     grayscale=grayscale)
     exp.run_experiments()
 
 def recreate_late_fusion_notebook_experiment():
@@ -63,6 +78,42 @@ def very_quick_test():
                              active_learning_batch_size=16, training_epochs=1, test_repeat_count=1
                          )
                      ],
+                     is_test=True)
+    exp.run_experiments()
+
+def very_quick_test_grayscale():
+    exp = Experiment(name="very_quick_test_grayscale",
+                     models=[MiddleFusionModel],
+                     query_function_names=ALL_QUERY_FUNCTION_NAMES,
+                     experiment_configs=[ExperimentConfig(
+                         initial_train_data_fraction=0.05, final_model_layer_len=64,
+                         active_learning_batch_size=32, training_epochs=1, test_repeat_count=1
+                     ),
+                         ExperimentConfig(
+                             initial_train_data_fraction=0.05, final_model_layer_len=64,
+                             active_learning_batch_size=16, training_epochs=1, test_repeat_count=1
+                         )
+                     ],
+                     is_test=True,
+                     grayscale=True)
+    exp.run_experiments()
+
+def very_quick_badge_test():
+    exp = Experiment(name="very_quick_BADGE_test",
+                     models=[MiddleFusionModel],
+                     query_function_names=["BADGE"],
+                     experiment_configs=[ExperimentConfig(
+                         initial_train_data_fraction=0.05, final_model_layer_len=64,
+                         active_learning_batch_size=32, training_epochs=1, test_repeat_count=1
+                     ),
+                         ExperimentConfig(
+                             initial_train_data_fraction=0.05, final_model_layer_len=64,
+                             active_learning_batch_size=16, training_epochs=1, test_repeat_count=1
+                         )
+                     ],
+                     query_function_name_to_extra_options={
+                         "BADGE": [KMeansPlusPlusSeeding(), WeightedKMeansSampling()]
+                     },
                      is_test=True)
     exp.run_experiments()
 
@@ -117,7 +168,9 @@ if __name__ == '__main__':
     """
     We'll run all the experiments in this function
     """
+    very_quick_test_grayscale()
+    #very_quick_badge_test()
     #very_quick_test()
-    new_experiments()
-    cluster_margin_cluster_methods_experiments()
-    badge_sample_methods_experiments()
+    #new_experiments()
+    #cluster_margin_cluster_methods_experiments()
+    #badge_sample_methods_experiments()
