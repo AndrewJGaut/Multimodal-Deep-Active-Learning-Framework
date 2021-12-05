@@ -115,17 +115,6 @@ class MultiModalLateFusionLinearModelInterface(ModelInterface):
         self.model = MultiModalLateFusionLinearModel().to(DEVICE)
         self.opt = torch.optim.Adam(self.model.parameters(), lr=1e-3)
 
-        # For cluster-margin active learning algorithm, clusters must be
-        # saved between queries
-        if self.query_function_name == "CLUSTER_MARGIN":
-            self.cluster_margin = ClusterMarginQueryFunction(
-                self.model, [self.model.post_fusion_layer.weight],
-                margin_batch_size=2 * self.active_learning_batch_size,
-                target_batch_size=self.active_learning_batch_size
-            )
-        else:
-            self.cluster_margin = None
-
     def train(self, train_x: List[np.ndarray], train_y: np.ndarray) -> None:
         data_len = train_y.shape[0]
 
