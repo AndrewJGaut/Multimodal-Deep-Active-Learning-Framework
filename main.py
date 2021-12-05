@@ -32,8 +32,8 @@ BASELINE_CONFIGS = [
 other_experiment_config = ExperimentConfig(
         initial_train_data_fraction=0.05,
         active_learning_batch_size=64,
-        training_epochs=15,
-        test_repeat_count=4
+        training_epochs=20,
+        test_repeat_count=8
 )
 
 def run_all_relevant_experiments():
@@ -187,6 +187,8 @@ if __name__ == '__main__':
     """
     We'll run all the experiments in this function
     """
+    very_quick_test()
+    """
     new_experiments_just_linear()
     new_experiments_just_linear(grayscale=True)
 
@@ -196,6 +198,7 @@ if __name__ == '__main__':
     cluster_margin_cluster_methods_experiments()
     cluster_margin_cluster_methods_experiments(experiment_configs=[other_experiment_config])
     badge_sample_methods_experiments(experiment_configs=[other_experiment_config])
+    """
     #very_quick_test()
     #very_quick_test_grayscale()
     #very_quick_badge_test()

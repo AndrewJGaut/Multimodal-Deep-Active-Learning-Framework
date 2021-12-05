@@ -104,10 +104,12 @@ class MultiModalLateFusionLinearModelInterface(ModelInterface):
 
         self.NUM_CLASSES = 4
 
+        self._name = "linear-model-based-on-sofmax-regression"
+
         self.reset()
 
     def name(self):
-        return "linear-model-based-on-sofmax-regression"
+        return self._name
 
     def reset(self):
         self.model = MultiModalLateFusionLinearModel().to(DEVICE)
