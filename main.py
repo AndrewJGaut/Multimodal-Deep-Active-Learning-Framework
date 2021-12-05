@@ -74,7 +74,7 @@ def very_quick_test():
                      query_function_names=ALL_QUERY_FUNCTION_NAMES,
                      experiment_configs=[ExperimentConfig(
                          initial_train_data_fraction=0.001, final_model_layer_len=64,
-                         active_learning_batch_size=32, training_epochs=1, test_repeat_count=1
+                         active_learning_batch_size=32, training_epochs=2, test_repeat_count=2
                      ),
                          ExperimentConfig(
                              initial_train_data_fraction=0.001, final_model_layer_len=64,
