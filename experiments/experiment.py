@@ -146,7 +146,10 @@ class Experiment:
         Path('/'.join(outfile_path.split('/')[:-1])).mkdir(parents=True, exist_ok=True)  # create directory if necessary
         # plot the file
         self.tester.plot_results(plot_savename=outfile_path)
-
+        
+        # Save data for editing plots if necessary
+        datafile_path = ".".join(outfile_path.split(".")[:-1] + ["data"])
+        self.tester.save_results(datafile_path)
 
     def run_experiments(self):
         # load data
