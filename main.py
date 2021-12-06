@@ -195,7 +195,8 @@ if __name__ == '__main__':
     """
     We'll run all the experiments in this function
     """
-    very_quick_test()
+    new_experiments(experiment_configs=[other_experiment_config])
+#very_quick_test()
     """
     new_experiments_just_linear()
     new_experiments_just_linear(grayscale=True)
