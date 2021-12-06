@@ -29,11 +29,19 @@ BASELINE_CONFIGS = [
 ]
 
 
+
 other_experiment_config = ExperimentConfig(
         initial_train_data_fraction=0.05,
         active_learning_batch_size=64,
         training_epochs=20,
-        test_repeat_count=8
+        test_repeat_count=2
+)
+
+big_batch_size_config = ExperimentConfig(
+        initial_train_data_fraction=0.05,
+        active_learning_batch_size=256,
+        training_epochs=20,
+        test_repeat_count=2
 )
 
 def run_all_relevant_experiments():
