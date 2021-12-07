@@ -3,6 +3,7 @@ from typing import List
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
 import time
+import pickle
 import sklearn.metrics as skm
 
 from test_framework.model_interface import ModelInterface
@@ -28,7 +29,7 @@ class Tester:
 
         # Function to call to measure performance (may change for different data formats)
         # Must be consistent for all models compared.
-        self.METRIC_FUNCTION = metrics.ACCURACY
+        self.METRIC_FUNCTION = metrics.LABEL_BALANCED_ACCURACY
 
         # Fraction of input data to set aside for testing
         self.TEST_DATA_FRACTION = 0.1
@@ -135,8 +136,13 @@ class Tester:
 
                 # Trigger training epoch
                 for epoch in range(self.TRAINING_EPOCHS):
-                    # TODO: Shuffle data at each training epoch
-                    model.train(train_x, train_y)
+                    shuffle_order = np.random.permutation(len(train_y))
+                    shuffled_y = train_y[shuffle_order]
+                    shuffled_x = [
+                        x_mode[shuffle_order]
+                        for x_mode in train_x
+                    ]
+                    model.train(shuffled_x, shuffled_y)
                 training_time = time.time() - pre_train_time
 
                 # Query model for samples to label
@@ -170,11 +176,24 @@ class Tester:
         self.model_results.append(results)
 
 
+    '''
+    Saves full test results for all models, allowing reloading and replotting
+    '''
+    def save_results(self, savename="test_results.data"):
+        with open(savename, "wb") as fp:
+            pickle.dump(self.model_results, fp)
 
     '''
-    Plots and saves train/test curves for all models, along with their AUC measures
+    Loads model results list from a given file
     '''
-    def plot_results(self, plot_savename="test_results.png") -> None:
+    def load_results(self, savename="test_results.data"):
+        with open(savename, "rb") as fp:
+            self.model_results = pickle.load(fp)
+
+    '''
+    Plots and saves train/test curves for all models, along with their ALC measures
+    '''
+    def plot_results(self, plot_savename="test_results.png", show=False) -> None:
         fig, axarr = plt.subplots(2, 2, figsize=(10,8), constrained_layout=True)
 
         model_names = [r.model_name for r in self.model_results]
@@ -185,15 +204,7 @@ class Tester:
             y = np.mean(r.training_performance, axis=0)
             axarr[0][0].plot(x, y, label=r.model_name)
         axarr[0][0].legend()
-        axarr[0][0].title.set_text("Training Performance")
-
-        # Plot train AuC measure for each model
-        train_auc = []
-        for r in self.model_results:
-            y = np.mean(r.training_performance, axis=0)
-            train_auc.append(skm.auc(range(self.ACTIVE_LEARNING_LOOP_COUNT), y))
-        axarr[0][1].bar(model_names, train_auc)
-        axarr[0][1].title.set_text("Training AuC")
+        axarr[0][0].title.set_text("Training Accuracy")
 
         # Plot testing curve
         for r in self.model_results:
@@ -201,19 +212,53 @@ class Tester:
             y = np.mean(r.test_performance, axis=0)
             axarr[1][0].plot(x, y, label=r.model_name)
         axarr[1][0].legend()
-        axarr[1][0].title.set_text("Testing Performance")
+        axarr[1][0].title.set_text("Testing Accuracy")
 
-        # Plot test AuC measure for each model
-        test_auc = []
+        # Calculate ALC measure for each model
+        train_alc = []
+        for r in self.model_results:
+            y = np.mean(r.training_performance, axis=0)
+            train_alc.append(skm.auc(range(self.ACTIVE_LEARNING_LOOP_COUNT), y))
+        test_alc = []
         for r in self.model_results:
             y = np.mean(r.test_performance, axis=0)
-            test_auc.append(skm.auc(range(self.ACTIVE_LEARNING_LOOP_COUNT), y))
-        axarr[1][1].bar(model_names, test_auc)
-        axarr[1][1].title.set_text("Testing AuC")
+            test_alc.append(skm.auc(range(self.ACTIVE_LEARNING_LOOP_COUNT), y))
+        
+        # Choose bar graph bounds
+        min_alc = min(*train_alc, *test_alc)
+        max_alc = max(*train_alc, *test_alc)
+        bar_ylim_lower = min_alc - 0.1 * (max_alc - min_alc)
+        bar_ylim_upper = max_alc + 0.1 * (max_alc - min_alc)
+
+        # Plot train ALC measure for each model
+        axarr[0][1].bar(model_names, train_alc)
+        axarr[0][1].set_ylim(bar_ylim_lower, bar_ylim_upper)
+        axarr[0][1].set_xticklabels(
+            model_names,
+            fontdict={
+                'rotation': 45, 
+                'horizontalalignment': 'right'
+            }
+        )
+        axarr[0][1].title.set_text("Training ALC")
+
+        # Plot test ALC measure for each model
+        
+        axarr[1][1].bar(model_names, test_alc)
+        axarr[1][1].set_ylim(bar_ylim_lower, bar_ylim_upper)
+        axarr[1][1].set_xticklabels(
+            model_names,
+            fontdict={
+                'rotation': 45, 
+                'horizontalalignment': 'right'
+            }
+        )
+        axarr[1][1].title.set_text("Testing ALC")
 
         # Save plots
-        plt.savefig(plot_savename)
-        plt.show()
+        plt.savefig(plot_savename, facecolor='white', transparent=False)
+        if show:
+            plt.show()
 
 
 

@@ -7,9 +7,14 @@ from torch.utils.data import TensorDataset, DataLoader
 import time
 from typing import List
 
+from active_learning.categorical_query_functions import *
+from active_learning.cluster_margin import *
+from active_learning.badge import *
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-def train_model_given_numpy_arrays(model, x1, x2, x2_image_counts, y, criterion, optimizer, num_epochs=25, batch_size=8, verbose=True):
+def train_model_given_numpy_arrays(model, x1, x2, x2_image_counts, y, criterion, optimizer, batch_size=8, verbose=True):
+    NUM_EPOCHS = 1 # the number of training epochs is set in the Tester class
 
     # Convert data to data loader so that it isn't allocated on the GPU all at once.
     x1_tensor = torch.tensor(x1)
@@ -22,7 +27,7 @@ def train_model_given_numpy_arrays(model, x1, x2, x2_image_counts, y, criterion,
 
     since = time.time()
 
-    for epoch in range(num_epochs):
+    for epoch in range(NUM_EPOCHS):
         # Each epoch has a training and validation phase
         model.train()  # Set model to training mode
 
@@ -59,7 +64,7 @@ def train_model_given_numpy_arrays(model, x1, x2, x2_image_counts, y, criterion,
         epoch_acc = running_corrects.double() / len(y)
         if verbose:
             print('Epoch {}/{} - Train Loss: {:.4f} Acc: {:.4f}'.format(
-                epoch, num_epochs - 1, epoch_loss, epoch_acc))
+                epoch, NUM_EPOCHS - 1, epoch_loss, epoch_acc))
 
     if verbose:
         print()
@@ -109,7 +114,11 @@ class MiddleFusionNet(torch.nn.Module):
             nn.ReLU(inplace=True),
         )
         self.final_linear = nn.Linear(1024*2, num_classes)
-    def forward(self, x1: torch.Tensor, x2: torch.Tensor, x2_image_counts: torch.Tensor) -> torch.Tensor:
+    def forward(self, x1: torch.Tensor, x2: torch.Tensor, x2_image_counts: torch.Tensor = None) -> torch.Tensor:
+        """FOR NOW, assume we have all the images in the sequence"""
+        # x1, x2, x2_image_counts = x
+        x2_image_counts = torch.from_numpy(np.ones(x2.shape[0]) * x2.shape[1])  # x_2.shape[1] is the max num images
+
         x1_features = self.conv1(x1)
         x1_features = self.avgpool1(x1_features)
         x1_features = torch.flatten(x1_features, 1)
@@ -118,6 +127,7 @@ class MiddleFusionNet(torch.nn.Module):
         x2_embeddings = []
         for count, x2_image_stack in zip(x2_image_counts,x2):
             if count > 0:
+                count = count.int()
                 cur_x2_features = self.conv2(x2_image_stack[0:count])
                 cur_x2_features = self.avgpool2(cur_x2_features)
                 cur_x2_features = torch.flatten(cur_x2_features, 1)
@@ -137,23 +147,25 @@ class MiddleFusionModel(ModelInterface):
     '''
     Instantiate the middle fusion model.
     '''
-    def __init__(self, active_learning_function,
-                 name=None, details=None, random_seed=None,
-                num_epochs=3, batch_size=8, train_verbose=True,
-                query_function=None):
-        self.active_learning_function = active_learning_function
-        self.model = MiddleFusionNet(num_classes=4,random_seed=random_seed)
-        self._name = name
-        self._details = details
+    def __init__(self, query_function_name: str, active_learning_batch_size: int = 32, extra_query_option=None,
+                 random_seed=None, train_verbose=False):
+        self.query_function_name = query_function_name
+        self.active_learning_batch_size = active_learning_batch_size
+        self.extra_query_option = extra_query_option
 
-        # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.model.to(device)
-        self._name = name
-        self._details = details
-        self.num_epochs = num_epochs
-        self.batch_size = batch_size
+        self.random_seed = random_seed
         self.train_verbose = train_verbose
-        self.query_function = query_function
+
+        # Model Training Constants
+        self.TRAINING_MINIBATCH_SIZE = 8
+
+        self.reset()
+
+        self._name = "Multimodal-middle-fusion-model-based-on-AlexNet"
+
+    def reset(self):
+        self.model = MiddleFusionNet(num_classes=4, random_seed=self.random_seed)
+        self.opt = torch.optim.Adam(self.model.parameters(), lr=1e-3)
 
         params_to_update = self.model.parameters()
 
@@ -164,6 +176,28 @@ class MiddleFusionModel(ModelInterface):
         # store criterion
         self._criterion = nn.CrossEntropyLoss()
 
+        # For cluster-margin active learning algorithm, clusters must be
+        # saved between queries
+        if self.query_function_name == "CLUSTER_MARGIN":
+            self.cluster_margin = ClusterMarginQueryFunction(
+                self.model, [self.model.final_linear.weight],
+                margin_batch_size=2 * self.active_learning_batch_size,
+                target_batch_size=self.active_learning_batch_size,
+                cluster_method=self.extra_query_option
+            )
+            self.badge = None
+        elif self.query_function_name == "BADGE":
+            self.badge = BADGEQueryFunction(
+                self.model, [self.model.final_linear.weight],
+                target_batch_size=self.active_learning_batch_size,
+                sample_method=self.extra_query_option
+            )
+            self.cluster_margin = None
+        else:
+            self.cluster_margin = None
+            self.badge = None
+
+
 
     # IDENTIFIER METHODS
     '''
@@ -173,7 +207,7 @@ class MiddleFusionModel(ModelInterface):
     '''
     def name(self) -> str:
         if self._name is None:
-            return "Multimodal middle fusion model based on AlexNet"
+            return "Multimodal-middle-fusion-model-based-on-AlexNet"
         return self._name
 
     '''
@@ -184,20 +218,29 @@ class MiddleFusionModel(ModelInterface):
         return self.model.details()
 
     def train(self, x:List[np.ndarray], y: np.ndarray) -> None:
-        x1, x2, x2_image_counts = x
+        """FOR NOW, assume we have all the images in the sequence"""
+        #x1, x2, x2_image_counts = x
+        x1, x2 = x
+        x2_image_counts = np.ones(x2.shape[0]) * x2.shape[1] # x_2.shape[1] is the max num images
+
         torch.manual_seed(0) # comment this line out to increase variation across experiments
         self.model = train_model_given_numpy_arrays(self.model, x1, x2, x2_image_counts, y,
                                                     self._criterion, self._optimizer,
-                                                    self.num_epochs, self.batch_size, verbose=self.train_verbose)
+                                                    self.TRAINING_MINIBATCH_SIZE, verbose=self.train_verbose)
+
 
     def predict(self, x:List[np.ndarray]):
-        x1, x2, x2_image_counts = x
+        """FOR NOW, assume we have all the images in the sequence"""
+        # x1, x2, x2_image_counts = x
+        x1, x2 = x
+        x2_image_counts = np.ones(x2.shape[0]) * x2.shape[1]  # x_2.shape[1] is the max num images
+
         self.model.eval()
         x1 = torch.tensor(x1)
         x2 = torch.tensor(x2)
         x2_image_counts = torch.tensor(x2_image_counts)
         dataset = TensorDataset(x1,x2,x2_image_counts)
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, num_workers=0, shuffle=False)
+        dataloader = DataLoader(dataset, batch_size=self.TRAINING_MINIBATCH_SIZE, num_workers=0, shuffle=False)
         preds_list = []
         for (x1,x2,x2_image_counts,) in dataloader:
             x1 = x1.to(device)
@@ -213,6 +256,17 @@ class MiddleFusionModel(ModelInterface):
         return softmax_outputs
 
     def query(self, unlabeled_x:List[np.ndarray], labeling_batch_size: int) -> np.ndarray:
-        softmax_outputs = self.predict_proba(unlabeled_x)
-        indices = self.active_learning_function(softmax_outputs, labeling_batch_size)
-        return indices
+        if self.query_function_name == "RANDOM":
+            return RANDOM(self.predict_proba(unlabeled_x), labeling_batch_size)
+        elif self.query_function_name == "MIN_MAX":
+            return MIN_MAX(self.predict_proba(unlabeled_x), labeling_batch_size)
+        elif self.query_function_name == "MIN_MARGIN":
+            return MIN_MARGIN(self.predict_proba(unlabeled_x), labeling_batch_size)
+        elif self.query_function_name == "MAX_ENTROPY":
+            return MAX_ENTROPY(self.predict_proba(unlabeled_x), labeling_batch_size)
+        elif self.query_function_name == "CLUSTER_MARGIN":
+            return self.cluster_margin.query(unlabeled_x)
+        elif self.query_function_name == "BADGE":
+            return self.badge.query(unlabeled_x)
+        else:
+            raise ValueError(f"Unrecognized query function name: {self.query_function_name}")
