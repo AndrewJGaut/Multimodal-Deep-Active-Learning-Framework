@@ -27,13 +27,15 @@ Plots and saves train/test curves for all models, along with their ALC measures
 '''
 
 
-def plot_results(model_results, plot_savename="test_results.png", show=False) -> None:
+def plot_results(model_results, plot_savename="test_results.png", show=False, edit_name=False) -> None:
     fig, axarr = plt.subplots(2, 2, figsize=(10, 8), constrained_layout=True)
 
     #plt.title(plot_savename.split(".")[0])
     fig.suptitle(plot_savename.split(".")[0])
 
     model_names = [r.model_name for r in model_results]
+    if edit_name:
+        model_names = [model_name.split("_")[-1] for model_name in model_names]
 
     # Plot training curve
     for r in model_results:
@@ -150,13 +152,19 @@ if __name__ == '__main__':
         ("Multimodal-middle-fusion-model-based-on-AlexNet_0.05,64,32,20,8.data",
          "Middle Fusion Model on Regular Dataset"),
         ("Multimodal-middle-fusion-model-based-on-AlexNet_0.05,64,32,20,8_{GRAYSCALE}.data",
-         "Middle Fusion Model on Grayscale Dataset")
+         "Middle Fusion Model on Grayscale Dataset"),
+        ("cluster_method.data", "Late Fusion Model on Regular Dataset -- Cluster Margin with Varying Cluster Methods", True),
+        ("badge_methods.data", "Late Fusion Model on Regular Dataset -- BADGE with Varying Sample Methods", True),
+
     ]
     #model_results = load_results("outputs/FINAL_OUTPUTS/linear-model-based-on-sofmax-regression_0.05,64,32,20,8.data")
     #plot_results(model_results, "TEST_RESULTS.png")
 
     for pair in title_name_file_name_pairs:
         model_results = load_results(os.path.join("outputs", "FINAL_OUTPUTS", pair[0]))
-        plot_results(model_results, pair[1] + ".png")
+        if len(pair) > 2:
+            plot_results(model_results, pair[1] + ".png", edit_name=True)
+        else:
+            plot_results(model_results, pair[1] + ".png")
 
 
